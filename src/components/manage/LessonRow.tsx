@@ -1,16 +1,20 @@
 "use client";
 
 import Image from "next/image";
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
+import { createClient } from "@/lib/supabase/client";
 import {
   deleteLesson,
   moveLesson,
+  moveLessonToModule,
   renameLesson,
   setLessonPublished,
+  setLessonThumbnail,
   setLessonVideo,
 } from "@/app/(app)/manage/actions";
 import { hasVideo, parseYouTubeId, watchUrl } from "@/lib/youtube";
-import type { ManageLesson } from "@/components/views/types";
+import { thumbnailUrl } from "@/lib/thumbnails";
+import type { ManageLesson, MoveTarget } from "@/components/views/types";
 
 const iconBtn =
   "grid h-7 w-7 place-items-center rounded-md border border-border text-muted transition hover:border-border-strong hover:text-foreground disabled:opacity-30";
@@ -20,33 +24,42 @@ export default function LessonRow({
   ordinal,
   isFirst,
   isLast,
+  moduleId,
+  moveTargets,
   demo = false,
 }: {
   lesson: ManageLesson;
   ordinal: number;
   isFirst: boolean;
   isLast: boolean;
+  moduleId: string;
+  moveTargets: MoveTarget[];
   demo?: boolean;
 }) {
   const linked = hasVideo(lesson.youtubeId);
 
   const [title, setTitle] = useState(lesson.title);
   const [url, setUrl] = useState(linked ? watchUrl(lesson.youtubeId) : "");
+  const [thumbPath, setThumbPath] = useState(lesson.thumbnailPath);
+  const [localThumb, setLocalThumb] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
   const [err, setErr] = useState(false);
   // Delete is two-click rather than a modal — a browser confirm() would block
   // the page, and this is a destructive action on someone else's course.
   const [confirmed, setConfirmed] = useState(false);
+  const [busy, setBusy] = useState(false);
   const [pending, start] = useTransition();
+  const fileRef = useRef<HTMLInputElement>(null);
 
-  // Live feedback while typing, before anything is saved.
   const typedId = parseYouTubeId(url);
   const dirty = url.trim() !== (linked ? watchUrl(lesson.youtubeId) : "");
 
-  function report(r: { ok?: true; error?: string }, good: string) {
-    setErr(Boolean(r.error));
-    setMsg(r.error ?? good);
-  }
+  const preview =
+    localThumb ??
+    thumbnailUrl({
+      youtubeId: typedId ?? lesson.youtubeId,
+      thumbnailPath: thumbPath,
+    });
 
   function run(fn: () => Promise<{ ok?: true; error?: string }>, good: string) {
     if (demo) {
@@ -54,25 +67,99 @@ export default function LessonRow({
       setMsg(`${good} (preview — nothing saved)`);
       return;
     }
-    start(async () => report(await fn(), good));
+    start(async () => {
+      const r = await fn();
+      setErr(Boolean(r.error));
+      setMsg(r.error ?? good);
+    });
+  }
+
+  async function uploadThumb(file: File | undefined) {
+    if (!file) return;
+
+    if (demo) {
+      setLocalThumb(URL.createObjectURL(file));
+      setErr(false);
+      setMsg("Thumbnail set. (preview — nothing saved)");
+      return;
+    }
+
+    setBusy(true);
+    setMsg(null);
+
+    const safe = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+    const path = `${lesson.id}/${Date.now()}-${safe}`;
+
+    const { error } = await createClient()
+      .storage.from("thumbnails")
+      .upload(path, file, { upsert: false, contentType: file.type });
+
+    if (error) {
+      setErr(true);
+      setMsg(error.message);
+      setBusy(false);
+      return;
+    }
+
+    const r = await setLessonThumbnail(lesson.id, path);
+    setErr(Boolean(r.error));
+    setMsg(r.error ?? "Thumbnail updated.");
+    if (!r.error) setThumbPath(path);
+    setBusy(false);
   }
 
   return (
     <li className="flex gap-3 px-3 py-3">
-      <div className="relative mt-0.5 h-[54px] w-24 shrink-0 overflow-hidden rounded-md bg-surface-2">
-        {typedId ? (
-          <Image
-            src={`https://i.ytimg.com/vi/${typedId}/mqdefault.jpg`}
-            alt=""
-            fill
-            unoptimized
-            sizes="96px"
-            className="object-cover"
-          />
-        ) : (
-          <span className="grid h-full w-full place-items-center font-mono text-xs text-border-strong">
-            {String(ordinal).padStart(2, "0")}
+      <div className="shrink-0">
+        <button
+          type="button"
+          onClick={() => fileRef.current?.click()}
+          disabled={busy || pending}
+          title="Upload a custom thumbnail"
+          className="group relative block h-[54px] w-24 overflow-hidden rounded-md bg-surface-2"
+        >
+          {preview ? (
+            <Image
+              src={preview}
+              alt=""
+              fill
+              unoptimized
+              sizes="96px"
+              className="object-cover"
+            />
+          ) : (
+            <span className="grid h-full w-full place-items-center font-mono text-xs text-border-strong">
+              {String(ordinal).padStart(2, "0")}
+            </span>
+          )}
+          <span className="absolute inset-0 grid place-items-center bg-black/70 text-[10px] font-medium text-white opacity-0 transition group-hover:opacity-100">
+            {busy ? "…" : "Change"}
           </span>
+        </button>
+
+        <input
+          ref={fileRef}
+          type="file"
+          accept="image/*"
+          hidden
+          onChange={(e) => {
+            void uploadThumb(e.target.files?.[0]);
+            e.target.value = "";
+          }}
+        />
+
+        {(thumbPath || localThumb) && (
+          <button
+            type="button"
+            onClick={() => {
+              setLocalThumb(null);
+              setThumbPath(null);
+              run(() => setLessonThumbnail(lesson.id, null), "Back to YouTube's.");
+            }}
+            className="mt-1 w-24 text-[10px] text-muted-dim underline underline-offset-2 hover:text-foreground"
+          >
+            use YouTube&apos;s
+          </button>
         )}
       </div>
 
@@ -164,22 +251,48 @@ export default function LessonRow({
           </button>
         </div>
 
-        <p className="mt-1 text-[11px]">
-          {msg ? (
-            <span className={err ? "text-danger" : "text-muted"}>{msg}</span>
-          ) : url && !typedId ? (
-            <span className="text-danger">Not a YouTube link.</span>
-          ) : linked && !dirty ? (
-            <span className="text-muted-dim">
-              Linked · {lesson.youtubeId}
-              {lesson.durationSeconds
-                ? ` · ${Math.round(lesson.durationSeconds / 60)}m`
-                : " · runtime fills in on first watch"}
-            </span>
-          ) : (
-            <span className="text-muted-dim">No video linked yet.</span>
+        <div className="mt-1 flex flex-wrap items-center justify-between gap-2">
+          <p className="text-[11px]">
+            {msg ? (
+              <span className={err ? "text-danger" : "text-muted"}>{msg}</span>
+            ) : url && !typedId ? (
+              <span className="text-danger">Not a YouTube link.</span>
+            ) : linked && !dirty ? (
+              <span className="text-muted-dim">
+                Linked · {lesson.youtubeId}
+                {lesson.durationSeconds
+                  ? ` · ${Math.round(lesson.durationSeconds / 60)}m`
+                  : " · runtime fills in on first watch"}
+                {thumbPath ? " · custom thumbnail" : ""}
+              </span>
+            ) : (
+              <span className="text-muted-dim">No video linked yet.</span>
+            )}
+          </p>
+
+          {moveTargets.length > 1 && (
+            <select
+              value={moduleId}
+              aria-label="Move lecture to"
+              onChange={(e) => {
+                const target = e.target.value;
+                if (target !== moduleId) {
+                  run(
+                    () => moveLessonToModule(lesson.id, target),
+                    "Moved.",
+                  );
+                }
+              }}
+              className="rounded-md border border-border bg-background px-1.5 py-0.5 text-[11px] text-muted outline-none focus:border-accent"
+            >
+              {moveTargets.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.label}
+                </option>
+              ))}
+            </select>
           )}
-        </p>
+        </div>
       </div>
     </li>
   );

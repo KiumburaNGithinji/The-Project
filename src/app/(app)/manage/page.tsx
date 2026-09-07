@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import ManageView from "@/components/views/ManageView";
-import type { ManageModule } from "@/components/views/types";
+import type { ManageModule, MoveTarget } from "@/components/views/types";
 
 const COURSE_SLUG = process.env.DEFAULT_COURSE_SLUG ?? "day-trading";
 
@@ -9,15 +9,35 @@ type RawModule = {
   id: string;
   title: string;
   position: number;
+  parent_id: string | null;
   lessons: {
     id: string;
     title: string;
     youtube_id: string;
+    thumbnail_path: string | null;
     is_published: boolean;
     duration_seconds: number | null;
     position: number;
   }[];
 };
+
+function toManage(m: RawModule, children: ManageModule[]): ManageModule {
+  return {
+    id: m.id,
+    title: m.title,
+    children,
+    lessons: [...(m.lessons ?? [])]
+      .sort((a, b) => a.position - b.position)
+      .map((l) => ({
+        id: l.id,
+        title: l.title,
+        youtubeId: l.youtube_id,
+        thumbnailPath: l.thumbnail_path,
+        isPublished: l.is_published,
+        durationSeconds: l.duration_seconds,
+      })),
+  };
+}
 
 export default async function ManagePage() {
   const supabase = await createClient();
@@ -36,34 +56,38 @@ export default async function ManagePage() {
   const { data: course } = await supabase
     .from("courses")
     .select(
-      "id, title, modules(id, title, position, lessons(id, title, youtube_id, is_published, duration_seconds, position))",
+      "id, title, modules(id, title, position, parent_id, lessons(id, title, youtube_id, thumbnail_path, is_published, duration_seconds, position))",
     )
     .eq("slug", COURSE_SLUG)
     .maybeSingle();
 
   if (!course) redirect("/pending?reason=no_course");
 
-  const modules: ManageModule[] = ((course.modules ?? []) as RawModule[])
-    .sort((a, b) => a.position - b.position)
-    .map((m) => ({
-      id: m.id,
-      title: m.title,
-      lessons: [...(m.lessons ?? [])]
-        .sort((a, b) => a.position - b.position)
-        .map((l) => ({
-          id: l.id,
-          title: l.title,
-          youtubeId: l.youtube_id,
-          isPublished: l.is_published,
-          durationSeconds: l.duration_seconds,
-        })),
-    }));
+  const raw = ((course.modules ?? []) as RawModule[]).sort(
+    (a, b) => a.position - b.position,
+  );
+
+  const modules: ManageModule[] = raw
+    .filter((m) => !m.parent_id)
+    .map((section) =>
+      toManage(
+        section,
+        raw.filter((c) => c.parent_id === section.id).map((c) => toManage(c, [])),
+      ),
+    );
+
+  // Flat list for the "move lecture to" picker, topics indented under sections.
+  const moveTargets: MoveTarget[] = modules.flatMap((section) => [
+    { id: section.id, label: section.title },
+    ...section.children.map((t) => ({ id: t.id, label: `  ${section.title} › ${t.title}` })),
+  ]);
 
   return (
     <ManageView
       courseId={course.id}
       courseTitle={course.title}
       modules={modules}
+      moveTargets={moveTargets}
     />
   );
 }

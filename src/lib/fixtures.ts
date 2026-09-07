@@ -22,7 +22,6 @@ export const CORE: Seed[] = [
   { slug: "displacement", title: "Displacement", minutes: 26 },
   { slug: "accumulation", title: "Accumulation", minutes: 31 },
   { slug: "liquidity", title: "Liquidity", minutes: 38 },
-  { slug: "manipulation", title: "Manipulation", minutes: 29 },
   { slug: "ranges", title: "Ranges", minutes: 24 },
   { slug: "internal-manipulation", title: "Internal Manipulation", minutes: 33 },
   { slug: "confirmation", title: "Confirmation", minutes: 21 },
@@ -41,6 +40,18 @@ export const CORE: Seed[] = [
   { slug: "protection", title: "Protection", minutes: 20 },
   { slug: "identification", title: "Identification", minutes: 26 },
   { slug: "conclusion", title: "Conclusion", minutes: 11 },
+];
+
+/** A topic that holds several parts, the "Manipulation Pt 1 / Pt 2" case. */
+export const TOPICS: { id: string; title: string; parts: Seed[] }[] = [
+  {
+    id: "manipulation",
+    title: "Manipulation",
+    parts: [
+      { slug: "manipulation-pt1", title: "Manipulation Pt 1", minutes: 29 },
+      { slug: "manipulation-pt2", title: "Manipulation Pt 2", minutes: 24 },
+    ],
+  },
 ];
 
 export const ADVANCED: Seed[] = [
@@ -64,17 +75,22 @@ const HOMEWORK_ON = new Set([
   "amd",
 ]);
 
-export const ALL: Seed[] = [...CORE, ...ADVANCED];
+export const ALL: Seed[] = [
+  ...CORE,
+  ...TOPICS.flatMap((t) => t.parts),
+  ...ADVANCED,
+];
 
 export function previewModules(): CourseModuleRow[] {
-  const build = (seeds: Seed[], offset: number, ordinalBase: number) =>
+  const build = (seeds: Seed[], progressOffset: number, ordinalBase: number) =>
     seeds.map((s, i) => {
-      const p = fakeProgress(i + offset);
+      const p = fakeProgress(i + progressOffset);
       const hasHw = HOMEWORK_ON.has(s.slug);
       return {
         id: s.slug,
         title: s.title,
         youtubeId: PREVIEW_VIDEO,
+        thumbnailPath: null,
         ordinal: ordinalBase + i + 1,
         durationSeconds: s.minutes * 60,
         percent: p.percent,
@@ -84,18 +100,32 @@ export function previewModules(): CourseModuleRow[] {
       };
     });
 
+  const topicParts = TOPICS.reduce((n, t) => n + t.parts.length, 0);
+
   return [
     {
       id: "core",
       title: "The Project",
       description: "The full system, in order.",
       lessons: build(CORE, 0, 0),
+      children: TOPICS.map((t, ti) => ({
+        id: t.id,
+        title: t.title,
+        description: null,
+        lessons: build(
+          t.parts,
+          7,
+          CORE.length + TOPICS.slice(0, ti).reduce((n, x) => n + x.parts.length, 0),
+        ),
+        children: [],
+      })),
     },
     {
       id: "advanced",
       title: "Advanced",
       description: "Refinements once the core is second nature.",
-      lessons: build(ADVANCED, 99, CORE.length),
+      lessons: build(ADVANCED, 99, CORE.length + topicParts),
+      children: [],
     },
   ];
 }

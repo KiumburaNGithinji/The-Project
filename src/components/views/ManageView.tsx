@@ -10,13 +10,16 @@ export default function ManageView({
   courseId,
   courseTitle,
   modules,
+  moveTargets,
   demo = false,
 }: ManageViewProps) {
   const [newModule, setNewModule] = useState("");
   const [msg, setMsg] = useState<string | null>(null);
   const [pending, start] = useTransition();
 
-  const all = modules.flatMap((m) => m.lessons);
+  const flatten = (list: typeof modules): typeof modules =>
+    list.flatMap((m) => [m, ...flatten(m.children)]);
+  const all = flatten(modules).flatMap((m) => m.lessons);
   const linked = all.filter((l) => hasVideo(l.youtubeId)).length;
   const live = all.filter((l) => l.isPublished).length;
 
@@ -82,9 +85,19 @@ export default function ManageView({
           <ModuleBlock
             key={m.id}
             module={m}
+            courseId={courseId}
+            moveTargets={moveTargets}
+            isFirst={i === 0}
+            isLast={i === modules.length - 1}
             ordinalBase={modules
               .slice(0, i)
-              .reduce((n, prev) => n + prev.lessons.length, 0)}
+              .reduce(
+                (n, prev) =>
+                  n +
+                  prev.lessons.length +
+                  prev.children.reduce((k, c) => k + c.lessons.length, 0),
+                0,
+              )}
             demo={demo}
           />
         ))}

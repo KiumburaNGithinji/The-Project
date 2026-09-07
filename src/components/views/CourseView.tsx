@@ -1,8 +1,32 @@
 import Link from "next/link";
 import LectureCard from "@/components/LectureCard";
-import type { CourseLessonRow, CourseViewProps } from "./types";
+import type { CourseLessonRow, CourseModuleRow, CourseViewProps } from "./types";
 
-type Flat = { lesson: CourseLessonRow; moduleId: string; moduleTitle: string };
+type Flat = {
+  lesson: CourseLessonRow;
+  sectionId: string;
+  groupId: string;
+  groupLabel: string;
+};
+
+function flatten(modules: CourseModuleRow[]): Flat[] {
+  return modules.flatMap((section) => [
+    ...section.lessons.map((lesson) => ({
+      lesson,
+      sectionId: section.id,
+      groupId: section.id,
+      groupLabel: section.title,
+    })),
+    ...section.children.flatMap((topic) =>
+      topic.lessons.map((lesson) => ({
+        lesson,
+        sectionId: section.id,
+        groupId: topic.id,
+        groupLabel: `${section.title} › ${topic.title}`,
+      })),
+    ),
+  ]);
+}
 
 function matches(f: Flat, filter: string, query: string) {
   if (query && !f.lesson.title.toLowerCase().includes(query.toLowerCase())) {
@@ -20,8 +44,29 @@ function matches(f: Flat, filter: string, query: string) {
     case "homework":
       return f.lesson.homeworkTotal > 0;
     default:
-      return f.moduleId === filter;
+      return f.sectionId === filter || f.groupId === filter;
   }
+}
+
+function Grid({
+  items,
+  basePath,
+}: {
+  items: Flat[];
+  basePath: string;
+}) {
+  return (
+    <div className="grid grid-cols-1 gap-x-4 gap-y-7 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+      {items.map((f) => (
+        <LectureCard
+          key={f.lesson.id}
+          lesson={f.lesson}
+          moduleTitle={f.groupLabel}
+          basePath={basePath}
+        />
+      ))}
+    </div>
+  );
 }
 
 export default function CourseView({
@@ -36,14 +81,7 @@ export default function CourseView({
   query = "",
   filter = "all",
 }: CourseViewProps) {
-  const flat: Flat[] = modules.flatMap((m) =>
-    m.lessons.map((lesson) => ({
-      lesson,
-      moduleId: m.id,
-      moduleTitle: m.title,
-    })),
-  );
-
+  const flat = flatten(modules);
   const visible = flat.filter((f) => matches(f, filter, query));
 
   const chips = [
@@ -57,15 +95,21 @@ export default function CourseView({
 
   const home = basePath || "/";
   const chipHref = (id: string) => {
-    const parts = [id === "all" ? null : `f=${id}`, query ? `q=${encodeURIComponent(query)}` : null]
+    const parts = [
+      id === "all" ? null : `f=${id}`,
+      query ? `q=${encodeURIComponent(query)}` : null,
+    ]
       .filter(Boolean)
       .join("&");
     return parts ? `${home}?${parts}` : home;
   };
 
+  // Unfiltered, lectures read as shelves so topics stay visible as groups.
+  // Searching or filtering collapses to one flat grid of results.
+  const browsing = filter === "all" && !query;
+
   return (
     <div>
-      {/* Chip rail — scrolls sideways on narrow screens, like YouTube's. */}
       <div className="-mx-4 mb-5 flex gap-2 overflow-x-auto px-4 pb-1 sm:-mx-6 sm:px-6">
         {chips.map((c) => {
           const active = filter === c.id;
@@ -122,21 +166,44 @@ export default function CourseView({
 
       {visible.length === 0 ? (
         <p className="rounded-lg border border-border bg-surface p-8 text-center text-sm text-muted">
-          {query
-            ? `No lectures match “${query}”.`
-            : "Nothing here yet."}
+          {query ? `No lectures match “${query}”.` : "Nothing here yet."}
         </p>
-      ) : (
-        <div className="grid grid-cols-1 gap-x-4 gap-y-7 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-          {visible.map((f) => (
-            <LectureCard
-              key={f.lesson.id}
-              lesson={f.lesson}
-              moduleTitle={f.moduleTitle}
-              basePath={basePath}
-            />
+      ) : browsing ? (
+        <div className="space-y-9">
+          {modules.map((section) => (
+            <section key={section.id}>
+              <h2 className="mb-3 text-sm font-semibold tracking-tight">
+                {section.title}
+              </h2>
+
+              {section.lessons.length > 0 && (
+                <Grid
+                  basePath={basePath}
+                  items={visible.filter(
+                    (f) => f.groupId === section.id,
+                  )}
+                />
+              )}
+
+              {section.children.map((topic) => (
+                <div key={topic.id} className="mt-6">
+                  <h3 className="mb-3 flex items-center gap-2 text-xs font-medium uppercase tracking-[0.14em] text-muted">
+                    {topic.title}
+                    <span className="font-mono text-[10px] normal-case tracking-normal text-muted-dim">
+                      {topic.lessons.length} parts
+                    </span>
+                  </h3>
+                  <Grid
+                    basePath={basePath}
+                    items={visible.filter((f) => f.groupId === topic.id)}
+                  />
+                </div>
+              ))}
+            </section>
           ))}
         </div>
+      ) : (
+        <Grid basePath={basePath} items={visible} />
       )}
     </div>
   );

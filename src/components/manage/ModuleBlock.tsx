@@ -2,27 +2,58 @@
 
 import { useState, useTransition } from "react";
 import LessonRow from "./LessonRow";
-import { addLesson, deleteModule, renameModule } from "@/app/(app)/manage/actions";
+import {
+  addLesson,
+  addModule,
+  deleteModule,
+  moveModule,
+  renameModule,
+} from "@/app/(app)/manage/actions";
 import { hasVideo } from "@/lib/youtube";
-import type { ManageModule } from "@/components/views/types";
+import type { ManageModule, MoveTarget } from "@/components/views/types";
+
+const iconBtn =
+  "grid h-7 w-7 place-items-center rounded-md border border-border text-muted transition hover:border-border-strong hover:text-foreground disabled:opacity-30";
+
+function countLinked(m: ManageModule): [number, number] {
+  const own = m.lessons;
+  const kids = m.children.map(countLinked);
+  return [
+    own.filter((l) => hasVideo(l.youtubeId)).length +
+      kids.reduce((n, [a]) => n + a, 0),
+    own.length + kids.reduce((n, [, b]) => n + b, 0),
+  ];
+}
 
 export default function ModuleBlock({
   module,
+  courseId,
   ordinalBase,
+  moveTargets,
+  isFirst,
+  isLast,
+  depth = 0,
   demo = false,
 }: {
   module: ManageModule;
+  courseId: string;
   ordinalBase: number;
+  moveTargets: MoveTarget[];
+  isFirst: boolean;
+  isLast: boolean;
+  depth?: number;
   demo?: boolean;
 }) {
   const [title, setTitle] = useState(module.title);
-  const [newTitle, setNewTitle] = useState("");
+  const [newLesson, setNewLesson] = useState("");
+  const [newTopic, setNewTopic] = useState("");
   const [msg, setMsg] = useState<string | null>(null);
   const [err, setErr] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
   const [pending, start] = useTransition();
 
-  const linked = module.lessons.filter((l) => hasVideo(l.youtubeId)).length;
+  const [linked, total] = countLinked(module);
+  const isTopic = depth > 0;
 
   function run(fn: () => Promise<{ ok?: true; error?: string }>, good: string) {
     if (demo) {
@@ -38,34 +69,67 @@ export default function ModuleBlock({
   }
 
   return (
-    <section className="rounded-lg border border-border bg-surface">
-      <div className="flex flex-wrap items-center gap-3 border-b border-border px-3 py-2.5">
+    <section
+      className={
+        isTopic
+          ? "rounded-lg border border-border bg-background"
+          : "rounded-lg border border-border bg-surface"
+      }
+    >
+      <div className="flex flex-wrap items-center gap-2 border-b border-border px-3 py-2.5">
+        {isTopic && (
+          <span className="font-mono text-[10px] uppercase tracking-wide text-muted-dim">
+            topic
+          </span>
+        )}
+
         <input
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           onBlur={() => {
             if (title.trim() && title !== module.title) {
-              run(() => renameModule(module.id, title), "Section renamed.");
+              run(() => renameModule(module.id, title), "Renamed.");
             }
           }}
-          aria-label="Section title"
-          className="min-w-0 flex-1 rounded-md border border-transparent bg-transparent px-2 py-1 text-sm font-semibold outline-none hover:border-border focus:border-border-strong focus:bg-background"
+          aria-label="Title"
+          className={`min-w-0 flex-1 rounded-md border border-transparent bg-transparent px-2 py-1 outline-none hover:border-border focus:border-border-strong focus:bg-background ${
+            isTopic ? "text-sm font-medium" : "text-sm font-semibold"
+          }`}
         />
 
         <span className="font-mono text-[11px] text-muted-dim">
-          {linked}/{module.lessons.length} linked
+          {linked}/{total} linked
         </span>
+
+        <button
+          type="button"
+          aria-label="Move up"
+          disabled={isFirst || pending}
+          onClick={() => run(() => moveModule(module.id, "up"), "Moved.")}
+          className={iconBtn}
+        >
+          ↑
+        </button>
+        <button
+          type="button"
+          aria-label="Move down"
+          disabled={isLast || pending}
+          onClick={() => run(() => moveModule(module.id, "down"), "Moved.")}
+          className={iconBtn}
+        >
+          ↓
+        </button>
 
         <button
           type="button"
           disabled={pending}
           onClick={() => {
             if (confirmed) {
-              run(() => deleteModule(module.id), "Section deleted.");
+              run(() => deleteModule(module.id), "Deleted.");
             } else {
               setConfirmed(true);
               setErr(true);
-              setMsg("Click again to delete this section.");
+              setMsg("Click again to delete.");
             }
           }}
           className={`rounded-md border px-2 py-1 text-xs transition ${
@@ -74,15 +138,11 @@ export default function ModuleBlock({
               : "border-border text-muted hover:text-foreground"
           }`}
         >
-          Delete section
+          Delete
         </button>
       </div>
 
-      {module.lessons.length === 0 ? (
-        <p className="px-4 py-6 text-center text-sm text-muted">
-          No lectures in this section yet.
-        </p>
-      ) : (
+      {module.lessons.length > 0 && (
         <ul className="divide-y divide-border">
           {module.lessons.map((l, i) => (
             <LessonRow
@@ -91,20 +151,52 @@ export default function ModuleBlock({
               ordinal={ordinalBase + i + 1}
               isFirst={i === 0}
               isLast={i === module.lessons.length - 1}
+              moduleId={module.id}
+              moveTargets={moveTargets}
               demo={demo}
             />
           ))}
         </ul>
       )}
 
-      <div className="flex items-center gap-2 border-t border-border px-3 py-2.5">
+      {module.children.length > 0 && (
+        <div className="space-y-3 border-t border-border p-3">
+          {module.children.map((child, i) => (
+            <ModuleBlock
+              key={child.id}
+              module={child}
+              courseId={courseId}
+              ordinalBase={
+                ordinalBase +
+                module.lessons.length +
+                module.children
+                  .slice(0, i)
+                  .reduce((n, c) => n + c.lessons.length, 0)
+              }
+              moveTargets={moveTargets}
+              isFirst={i === 0}
+              isLast={i === module.children.length - 1}
+              depth={depth + 1}
+              demo={demo}
+            />
+          ))}
+        </div>
+      )}
+
+      {module.lessons.length === 0 && module.children.length === 0 && (
+        <p className="px-4 py-5 text-center text-sm text-muted">
+          Nothing in here yet.
+        </p>
+      )}
+
+      <div className="flex flex-wrap items-center gap-2 border-t border-border px-3 py-2.5">
         <input
-          value={newTitle}
-          onChange={(e) => setNewTitle(e.target.value)}
+          value={newLesson}
+          onChange={(e) => setNewLesson(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === "Enter" && newTitle.trim()) {
-              run(() => addLesson(module.id, newTitle), "Lecture added.");
-              setNewTitle("");
+            if (e.key === "Enter" && newLesson.trim()) {
+              run(() => addLesson(module.id, newLesson), "Lecture added.");
+              setNewLesson("");
             }
           }}
           placeholder="New lecture title…"
@@ -113,21 +205,52 @@ export default function ModuleBlock({
         />
         <button
           type="button"
-          disabled={pending || !newTitle.trim()}
+          disabled={pending || !newLesson.trim()}
           onClick={() => {
-            run(() => addLesson(module.id, newTitle), "Lecture added.");
-            setNewTitle("");
+            run(() => addLesson(module.id, newLesson), "Lecture added.");
+            setNewLesson("");
           }}
           className="shrink-0 rounded-md border border-border-strong px-3 py-1 text-xs transition hover:bg-surface-2 disabled:opacity-30"
         >
           Add lecture
         </button>
+
+        {/* Only sections can hold topics — two levels, no deeper. */}
+        {!isTopic && (
+          <>
+            <input
+              value={newTopic}
+              onChange={(e) => setNewTopic(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && newTopic.trim()) {
+                  run(
+                    () => addModule(courseId, newTopic, module.id),
+                    "Topic added.",
+                  );
+                  setNewTopic("");
+                }
+              }}
+              placeholder="New topic, e.g. Manipulation…"
+              aria-label="New topic title"
+              className="min-w-0 flex-1 rounded-md border border-border bg-background px-2.5 py-1 text-sm outline-none placeholder:text-muted-dim focus:border-accent"
+            />
+            <button
+              type="button"
+              disabled={pending || !newTopic.trim()}
+              onClick={() => {
+                run(() => addModule(courseId, newTopic, module.id), "Topic added.");
+                setNewTopic("");
+              }}
+              className="shrink-0 rounded-md border border-border-strong px-3 py-1 text-xs transition hover:bg-surface-2 disabled:opacity-30"
+            >
+              Add topic
+            </button>
+          </>
+        )}
       </div>
 
       {msg && (
-        <p
-          className={`px-4 pb-2.5 text-[11px] ${err ? "text-danger" : "text-muted"}`}
-        >
+        <p className={`px-4 pb-2.5 text-[11px] ${err ? "text-danger" : "text-muted"}`}>
           {msg}
         </p>
       )}

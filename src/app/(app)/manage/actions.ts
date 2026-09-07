@@ -175,26 +175,85 @@ export async function moveLesson(
 export async function addModule(
   courseId: string,
   title: string,
+  parentId: string | null = null,
 ): Promise<Result> {
   const gate = await requireMentor();
   if (gate.error) return { error: gate.error };
-  if (!title.trim()) return { error: "Give the section a title." };
+  if (!title.trim()) return { error: "Give it a title." };
 
-  const { data: last } = await gate.supabase!
-    .from("modules")
-    .select("position")
-    .eq("course_id", courseId)
+  const supabase = gate.supabase!;
+
+  // Only two levels are offered, so a topic can never be nested in a topic.
+  if (parentId) {
+    const { data: parent } = await supabase
+      .from("modules")
+      .select("parent_id")
+      .eq("id", parentId)
+      .maybeSingle();
+    if (parent?.parent_id) {
+      return { error: "Topics can't be nested inside other topics." };
+    }
+  }
+
+  const query = supabase.from("modules").select("position").eq("course_id", courseId);
+  const { data: last } = await (parentId
+    ? query.eq("parent_id", parentId)
+    : query.is("parent_id", null)
+  )
     .order("position", { ascending: false })
     .limit(1)
     .maybeSingle();
 
-  const { error } = await gate.supabase!.from("modules").insert({
+  const { error } = await supabase.from("modules").insert({
     course_id: courseId,
+    parent_id: parentId,
     title: title.trim(),
     position: (last?.position ?? 0) + 1,
   });
 
   return error ? { error: error.message } : done();
+}
+
+/** Swap a section or topic with its neighbour at the same level. */
+export async function moveModule(
+  moduleId: string,
+  direction: "up" | "down",
+): Promise<Result> {
+  const gate = await requireMentor();
+  if (gate.error) return { error: gate.error };
+  const supabase = gate.supabase!;
+
+  const { data: self } = await supabase
+    .from("modules")
+    .select("id, course_id, parent_id, position")
+    .eq("id", moduleId)
+    .maybeSingle();
+
+  if (!self) return { error: "Not found." };
+
+  const base = supabase
+    .from("modules")
+    .select("id, position")
+    .eq("course_id", self.course_id);
+
+  const { data: neighbour } = await (self.parent_id
+    ? base.eq("parent_id", self.parent_id)
+    : base.is("parent_id", null)
+  )
+    [direction === "up" ? "lt" : "gt"]("position", self.position)
+    .order("position", { ascending: direction !== "up" })
+    .limit(1)
+    .maybeSingle();
+
+  if (!neighbour) return { ok: true };
+
+  const [a, b] = await Promise.all([
+    supabase.from("modules").update({ position: neighbour.position }).eq("id", self.id),
+    supabase.from("modules").update({ position: self.position }).eq("id", neighbour.id),
+  ]);
+
+  const err = a.error ?? b.error;
+  return err ? { error: err.message } : done();
 }
 
 export async function renameModule(
@@ -226,10 +285,74 @@ export async function deleteModule(moduleId: string): Promise<Result> {
     return { error: `Move or delete its ${count} lecture(s) first.` };
   }
 
+  const { count: kids } = await gate.supabase!
+    .from("modules")
+    .select("id", { count: "exact", head: true })
+    .eq("parent_id", moduleId);
+
+  if ((kids ?? 0) > 0) {
+    return { error: `Delete its ${kids} topic(s) first.` };
+  }
+
   const { error } = await gate.supabase!
     .from("modules")
     .delete()
     .eq("id", moduleId);
 
   return error ? { error: error.message } : done();
+}
+
+/** Move a lecture into a different section or topic, at the end. */
+export async function moveLessonToModule(
+  lessonId: string,
+  moduleId: string,
+): Promise<Result> {
+  const gate = await requireMentor();
+  if (gate.error) return { error: gate.error };
+  const supabase = gate.supabase!;
+
+  const { data: last } = await supabase
+    .from("lessons")
+    .select("position")
+    .eq("module_id", moduleId)
+    .order("position", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const { error } = await supabase
+    .from("lessons")
+    .update({ module_id: moduleId, position: (last?.position ?? 0) + 1 })
+    .eq("id", lessonId);
+
+  return error ? { error: error.message } : done();
+}
+
+export async function setLessonThumbnail(
+  lessonId: string,
+  path: string | null,
+): Promise<Result> {
+  const gate = await requireMentor();
+  if (gate.error) return { error: gate.error };
+
+  const supabase = gate.supabase!;
+
+  // Clean up the file being replaced so the bucket doesn't accumulate orphans.
+  const { data: existing } = await supabase
+    .from("lessons")
+    .select("thumbnail_path")
+    .eq("id", lessonId)
+    .maybeSingle();
+
+  const { error } = await supabase
+    .from("lessons")
+    .update({ thumbnail_path: path })
+    .eq("id", lessonId);
+
+  if (error) return { error: error.message };
+
+  if (existing?.thumbnail_path && existing.thumbnail_path !== path) {
+    await supabase.storage.from("thumbnails").remove([existing.thumbnail_path]);
+  }
+
+  return done();
 }

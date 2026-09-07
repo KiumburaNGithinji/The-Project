@@ -4,6 +4,7 @@ import {
   ADVANCED,
   ALL,
   CORE,
+  TOPICS,
   PREVIEW_QUESTIONS,
   PREVIEW_SUBMISSIONS,
   PREVIEW_VIDEO,
@@ -18,8 +19,9 @@ export default async function PreviewLessonPage({
   const seed = ALL.find((s) => s.slug === id);
   if (!seed) notFound();
 
+  const topic = TOPICS.find((t) => t.parts.some((p) => p.slug === id));
   const inAdvanced = ADVANCED.some((s) => s.slug === id);
-  const siblings = inAdvanced ? ADVANCED : CORE;
+  const siblings = topic ? topic.parts : inAdvanced ? ADVANCED : CORE;
   const idx = siblings.findIndex((s) => s.slug === id);
 
   const row = previewModules()
@@ -35,7 +37,13 @@ export default async function PreviewLessonPage({
     <LessonView
       basePath="/preview"
       demo
-      moduleTitle={inAdvanced ? "Advanced" : "The Project"}
+      moduleTitle={
+        topic
+          ? `The Project \u203a ${topic.title}`
+          : inAdvanced
+            ? "Advanced"
+            : "The Project"
+      }
       lesson={{
         id: seed.slug,
         title: seed.title,

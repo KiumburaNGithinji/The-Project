@@ -21,21 +21,39 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
       .maybeSingle(),
     supabase
       .from("courses")
-      .select("id, modules(id, title, position, lessons(id))")
+      .select("id, modules(id, title, position, parent_id, lessons(id))")
       .eq("slug", COURSE_SLUG)
       .maybeSingle(),
   ]);
 
-  type NavModule = {
+  type RawNav = {
     id: string;
     title: string;
     position: number;
+    parent_id: string | null;
     lessons: { id: string }[];
   };
 
-  const modules = ((course?.modules ?? []) as NavModule[])
-    .sort((a, b) => a.position - b.position)
-    .map((m) => ({ id: m.id, title: m.title, count: (m.lessons ?? []).length }));
+  const raw = ((course?.modules ?? []) as RawNav[]).sort(
+    (a, b) => a.position - b.position,
+  );
+
+  const modules = raw
+    .filter((m) => !m.parent_id)
+    .map((section) => {
+      const children = raw
+        .filter((c) => c.parent_id === section.id)
+        .map((c) => ({ id: c.id, title: c.title, count: (c.lessons ?? []).length }));
+      return {
+        id: section.id,
+        title: section.title,
+        // Section count includes its topics, so the sidebar totals add up.
+        count:
+          (section.lessons ?? []).length +
+          children.reduce((n, c) => n + c.count, 0),
+        children,
+      };
+    });
 
   return (
     <AppShell

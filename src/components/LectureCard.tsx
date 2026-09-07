@@ -1,5 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
+import { thumbnailUrl } from "@/lib/thumbnails";
 import type { CourseLessonRow } from "@/components/views/types";
 
 function timecode(seconds: number | null) {
@@ -28,26 +29,26 @@ export default function LectureCard({
   basePath?: string;
 }) {
   const duration = timecode(lesson.durationSeconds);
-  const isPreview = !lesson.youtubeId || lesson.youtubeId === "PREVIEW";
+  const thumb = thumbnailUrl(lesson);
 
   return (
     <Link href={`${basePath}/lessons/${lesson.id}`} className="group block">
       <div className="relative aspect-video overflow-hidden rounded-xl bg-surface-2">
-        {isPreview ? (
-          <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-surface-2 to-surface">
-            <span className="font-mono text-3xl text-border-strong">
-              {String(lesson.ordinal).padStart(2, "0")}
-            </span>
-          </div>
-        ) : (
+        {thumb ? (
           <Image
-            src={`https://i.ytimg.com/vi/${lesson.youtubeId}/mqdefault.jpg`}
+            src={thumb}
             alt=""
             fill
             unoptimized
             sizes="(max-width: 640px) 100vw, (max-width: 1280px) 50vw, 33vw"
             className="object-cover transition group-hover:scale-[1.02]"
           />
+        ) : (
+          <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-surface-2 to-surface">
+            <span className="font-mono text-3xl text-border-strong">
+              {String(lesson.ordinal).padStart(2, "0")}
+            </span>
+          </div>
         )}
 
         {duration && (

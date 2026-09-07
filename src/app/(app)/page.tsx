@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import CourseView from "@/components/views/CourseView";
-import type { CourseModuleRow } from "@/components/views/types";
+import type { CourseLessonRow, CourseModuleRow } from "@/components/views/types";
 import type { Assignment, Lesson, LessonProgress } from "@/lib/types";
 
 const COURSE_SLUG = process.env.DEFAULT_COURSE_SLUG ?? "day-trading";
@@ -11,7 +11,8 @@ type RawModule = {
   title: string;
   description: string | null;
   position: number;
-  lessons: Lesson[];
+  parent_id: string | null;
+  lessons: (Lesson & { thumbnail_path: string | null })[];
 };
 
 export default async function CoursePage({ searchParams }: PageProps<"/">) {
@@ -28,7 +29,7 @@ export default async function CoursePage({ searchParams }: PageProps<"/">) {
   const { data: course } = await supabase
     .from("courses")
     .select(
-      "id, title, description, modules(id, title, description, position, lessons(*))",
+      "id, title, description, modules(id, title, description, position, parent_id, lessons(*))",
     )
     .eq("slug", COURSE_SLUG)
     .maybeSingle();
@@ -64,46 +65,60 @@ export default async function CoursePage({ searchParams }: PageProps<"/">) {
       .map((s) => s.assignment_id as string),
   );
 
-  const ordered = ((course.modules ?? []) as RawModule[])
-    .sort((a, b) => a.position - b.position)
-    .map((m) => ({
-      id: m.id,
-      title: m.title,
-      description: m.description,
-      lessons: [...(m.lessons ?? [])]
-        .filter((l) => l.is_published)
-        .sort((a, b) => a.position - b.position),
-    }));
+  const raw = ((course.modules ?? []) as RawModule[]).sort(
+    (a, b) => a.position - b.position,
+  );
 
-  // Cards are numbered across the whole course, so the ordinal continues from
-  // one module into the next rather than restarting.
-  const modules: CourseModuleRow[] = ordered.map((m, mi) => {
-    const offset = ordered
-      .slice(0, mi)
-      .reduce((n, prev) => n + prev.lessons.length, 0);
+  const publishedOf = (m: RawModule) =>
+    [...(m.lessons ?? [])]
+      .filter((l) => l.is_published)
+      .sort((a, b) => a.position - b.position);
 
+  const sections = raw.filter((m) => !m.parent_id);
+  const childrenOf = (id: string) => raw.filter((m) => m.parent_id === id);
+
+  // Cards are numbered across the whole course: a section's own lectures, then
+  // its topics' lectures, then on to the next section.
+  const order: string[] = sections.flatMap((s) => [
+    ...publishedOf(s).map((l) => l.id),
+    ...childrenOf(s.id).flatMap((t) => publishedOf(t).map((l) => l.id)),
+  ]);
+  const ordinalOf = new Map(order.map((id, i) => [id, i + 1]));
+
+  const toRow = (l: RawModule["lessons"][number]): CourseLessonRow => {
+    const hw = assignmentsByLesson.get(l.id) ?? [];
     return {
-      id: m.id,
-      title: m.title,
-      description: m.description,
-      lessons: m.lessons.map((l, li) => {
-        const hw = assignmentsByLesson.get(l.id) ?? [];
-        return {
-          id: l.id,
-          title: l.title,
-          youtubeId: l.youtube_id,
-          ordinal: offset + li + 1,
-          durationSeconds: l.duration_seconds,
-          percent: Number(progress.get(l.id)?.percent_watched ?? 0),
-          completed: Boolean(progress.get(l.id)?.completed_at),
-          homeworkTotal: hw.length,
-          homeworkDone: hw.filter((a) => doneAssignments.has(a.id)).length,
-        };
-      }),
+      id: l.id,
+      title: l.title,
+      youtubeId: l.youtube_id,
+      thumbnailPath: l.thumbnail_path,
+      ordinal: ordinalOf.get(l.id) ?? 0,
+      durationSeconds: l.duration_seconds,
+      percent: Number(progress.get(l.id)?.percent_watched ?? 0),
+      completed: Boolean(progress.get(l.id)?.completed_at),
+      homeworkTotal: hw.length,
+      homeworkDone: hw.filter((a) => doneAssignments.has(a.id)).length,
     };
-  });
+  };
 
-  const allLessons = modules.flatMap((m) => m.lessons);
+  const modules: CourseModuleRow[] = sections.map((s) => ({
+    id: s.id,
+    title: s.title,
+    description: s.description,
+    lessons: publishedOf(s).map(toRow),
+    children: childrenOf(s.id).map((t) => ({
+      id: t.id,
+      title: t.title,
+      description: t.description,
+      lessons: publishedOf(t).map(toRow),
+      children: [],
+    })),
+  }));
+
+  const allLessons = modules.flatMap((m) => [
+    ...m.lessons,
+    ...m.children.flatMap((c) => c.lessons),
+  ]);
 
   return (
     <CourseView

@@ -4,6 +4,7 @@ export type CourseLessonRow = {
   id: string;
   title: string;
   youtubeId: string;
+  thumbnailPath: string | null;
   /** 1-based position across the whole course, shown on the card. */
   ordinal: number;
   durationSeconds: number | null;
@@ -18,6 +19,8 @@ export type CourseModuleRow = {
   title: string;
   description: string | null;
   lessons: CourseLessonRow[];
+  /** Topics nested inside this section, e.g. "Manipulation" -> Pt 1, Pt 2. */
+  children: CourseModuleRow[];
 };
 
 export type CourseViewProps = {
@@ -106,6 +109,7 @@ export type ManageLesson = {
   id: string;
   title: string;
   youtubeId: string;
+  thumbnailPath: string | null;
   isPublished: boolean;
   durationSeconds: number | null;
 };
@@ -114,11 +118,16 @@ export type ManageModule = {
   id: string;
   title: string;
   lessons: ManageLesson[];
+  children: ManageModule[];
 };
+
+/** Flat list of every section and topic, for the "move to" picker. */
+export type MoveTarget = { id: string; label: string };
 
 export type ManageViewProps = {
   courseId: string;
   courseTitle: string;
   modules: ManageModule[];
+  moveTargets: MoveTarget[];
   demo?: boolean;
 };

@@ -2,7 +2,12 @@ import Link from "next/link";
 import { Suspense, type ReactNode } from "react";
 import SearchBar from "@/components/SearchBar";
 
-type NavModule = { id: string; title: string; count: number };
+type NavModule = {
+  id: string;
+  title: string;
+  count: number;
+  children?: NavModule[];
+};
 
 export default function AppShell({
   basePath = "",
@@ -83,12 +88,26 @@ export default function AppShell({
           <p className="px-3 pb-1 text-xs font-medium text-muted">Modules</p>
           <nav className="space-y-0.5">
             {modules.map((m) => (
-              <Link key={m.id} href={`${home}?f=${m.id}`} className={subLink}>
-                <span className="truncate">{m.title}</span>
-                <span className="shrink-0 font-mono text-[11px] text-muted-dim">
-                  {m.count}
-                </span>
-              </Link>
+              <div key={m.id}>
+                <Link href={`${home}?f=${m.id}`} className={subLink}>
+                  <span className="truncate">{m.title}</span>
+                  <span className="shrink-0 font-mono text-[11px] text-muted-dim">
+                    {m.count}
+                  </span>
+                </Link>
+                {(m.children ?? []).map((t) => (
+                  <Link
+                    key={t.id}
+                    href={`${home}?f=${t.id}`}
+                    className={`${subLink} pl-6 text-xs`}
+                  >
+                    <span className="truncate">{t.title}</span>
+                    <span className="shrink-0 font-mono text-[11px] text-muted-dim">
+                      {t.count}
+                    </span>
+                  </Link>
+                ))}
+              </div>
             ))}
           </nav>
 
