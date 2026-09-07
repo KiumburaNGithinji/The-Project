@@ -1,5 +1,5 @@
 import ManageView from "@/components/views/ManageView";
-import { ADVANCED, CORE, TOPICS } from "@/lib/fixtures";
+import { ADVANCED, CORE, TOPICS, previewAssignments } from "@/lib/fixtures";
 import type { ManageModule, MoveTarget } from "@/components/views/types";
 
 /**
@@ -14,6 +14,7 @@ export default function PreviewManagePage() {
     thumbnailPath: null,
     isPublished: false,
     durationSeconds: null,
+    homeworkCount: previewAssignments(s.slug).length,
   });
 
   const modules: ManageModule[] = [

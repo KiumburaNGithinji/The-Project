@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { useRef, useState, useTransition } from "react";
 import { createClient } from "@/lib/supabase/client";
 import {
@@ -262,6 +263,18 @@ export default function LessonRow({
         </div>
 
         <div className="mt-1 flex flex-wrap items-center justify-between gap-2">
+          <Link
+            href={`${demo ? "/preview/manage" : "/manage"}/lessons/${lesson.id}`}
+            className="rounded-md border border-border px-2 py-0.5 text-[11px] text-muted transition hover:border-border-strong hover:text-foreground"
+          >
+            Homework
+            {lesson.homeworkCount > 0 && (
+              <span className="ml-1 font-mono text-muted-dim">
+                {lesson.homeworkCount}
+              </span>
+            )}
+          </Link>
+
           <p className="text-[11px]">
             {msg ? (
               <span className={err ? "text-danger" : "text-muted"}>{msg}</span>

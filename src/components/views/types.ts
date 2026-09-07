@@ -112,6 +112,7 @@ export type ManageLesson = {
   thumbnailPath: string | null;
   isPublished: boolean;
   durationSeconds: number | null;
+  homeworkCount: number;
 };
 
 export type ManageModule = {
@@ -129,5 +130,32 @@ export type ManageViewProps = {
   courseTitle: string;
   modules: ManageModule[];
   moveTargets: MoveTarget[];
+  demo?: boolean;
+};
+
+export type AdminQuestion = {
+  id: string;
+  prompt: string;
+  options: string[];
+  correctIndex: number;
+  explanation: string | null;
+};
+
+export type AdminAssignment = {
+  id: string;
+  kind: import("@/lib/types").AssignmentKind;
+  title: string;
+  instructions: string | null;
+  dueAt: string | null;
+  passScore: number | null;
+  questions: AdminQuestion[];
+  submissionCount: number;
+};
+
+export type HomeworkAdminViewProps = {
+  lessonId: string;
+  lessonTitle: string;
+  moduleTitle: string;
+  assignments: AdminAssignment[];
   demo?: boolean;
 };

@@ -21,7 +21,11 @@ type RawModule = {
   }[];
 };
 
-function toManage(m: RawModule, children: ManageModule[]): ManageModule {
+function toManage(
+  m: RawModule,
+  children: ManageModule[],
+  homework: Map<string, number>,
+): ManageModule {
   return {
     id: m.id,
     title: m.title,
@@ -35,6 +39,7 @@ function toManage(m: RawModule, children: ManageModule[]): ManageModule {
         thumbnailPath: l.thumbnail_path,
         isPublished: l.is_published,
         durationSeconds: l.duration_seconds,
+        homeworkCount: homework.get(l.id) ?? 0,
       })),
   };
 }
@@ -67,12 +72,27 @@ export default async function ManagePage() {
     (a, b) => a.position - b.position,
   );
 
+  // One row per assignment, tallied per lecture for the row badges.
+  const { data: assignmentRows } = await supabase
+    .from("assignments")
+    .select("lesson_id")
+    .eq("course_id", course.id);
+
+  const homework = new Map<string, number>();
+  for (const a of (assignmentRows ?? []) as { lesson_id: string | null }[]) {
+    if (!a.lesson_id) continue;
+    homework.set(a.lesson_id, (homework.get(a.lesson_id) ?? 0) + 1);
+  }
+
   const modules: ManageModule[] = raw
     .filter((m) => !m.parent_id)
     .map((section) =>
       toManage(
         section,
-        raw.filter((c) => c.parent_id === section.id).map((c) => toManage(c, [])),
+        raw
+          .filter((c) => c.parent_id === section.id)
+          .map((c) => toManage(c, [], homework)),
+        homework,
       ),
     );
 
