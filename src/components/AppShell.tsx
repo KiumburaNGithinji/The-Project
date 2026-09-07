@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { Suspense, type ReactNode } from "react";
 import SearchBar from "@/components/SearchBar";
+import { ROLE_LABELS } from "@/lib/roles";
+import type { Role } from "@/lib/types";
 
 type NavModule = {
   id: string;
@@ -11,7 +13,8 @@ type NavModule = {
 
 export default function AppShell({
   basePath = "",
-  isMentor,
+  isStaff,
+  role,
   displayName,
   modules,
   banner,
@@ -19,7 +22,9 @@ export default function AppShell({
   children,
 }: {
   basePath?: string;
-  isMentor: boolean;
+  isStaff: boolean;
+  /** Drives the badge only — access is decided by isStaff. */
+  role?: Role;
   displayName: string;
   modules: NavModule[];
   banner?: ReactNode;
@@ -54,9 +59,9 @@ export default function AppShell({
           </Suspense>
 
           <div className="flex shrink-0 items-center gap-3">
-            {isMentor && (
+            {isStaff && role && (
               <span className="hidden rounded-full border border-border-strong px-2 py-0.5 font-mono text-[10px] uppercase tracking-wide text-muted sm:inline">
-                mentor
+                {ROLE_LABELS[role].toLowerCase()}
               </span>
             )}
             <span className="hidden text-sm text-muted md:inline">{displayName}</span>
@@ -71,17 +76,25 @@ export default function AppShell({
             <Link href={home} className={navLink}>
               <span aria-hidden="true">▦</span> Course
             </Link>
-            {isMentor && (
-              <>
-                <Link href={`${basePath}/mentor`} className={navLink}>
-                  <span aria-hidden="true">◫</span> Students
-                </Link>
-                <Link href={`${basePath}/manage`} className={navLink}>
-                  <span aria-hidden="true">✎</span> Manage content
-                </Link>
-              </>
-            )}
           </nav>
+
+          {isStaff && (
+            <>
+              <div className="my-3 border-t border-border" />
+              <p className="px-3 pb-1 text-xs font-medium text-muted">Staff</p>
+              <nav className="space-y-0.5">
+                <Link href={`${basePath}/mentor`} className={subLink}>
+                  <span>Students</span>
+                </Link>
+                <Link href={`${basePath}/manage`} className={subLink}>
+                  <span>Content</span>
+                </Link>
+                <Link href={`${basePath}/settings`} className={subLink}>
+                  <span>Settings</span>
+                </Link>
+              </nav>
+            </>
+          )}
 
           <div className="my-3 border-t border-border" />
 

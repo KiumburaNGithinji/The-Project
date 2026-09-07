@@ -1,6 +1,8 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import AppShell from "@/components/AppShell";
+import { canManage } from "@/lib/roles";
+import type { Role } from "@/lib/types";
 import SignOutButton from "@/components/SignOutButton";
 
 const COURSE_SLUG = process.env.DEFAULT_COURSE_SLUG ?? "day-trading";
@@ -57,7 +59,8 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
 
   return (
     <AppShell
-      isMentor={profile?.role === "mentor"}
+      isStaff={canManage(profile?.role)}
+      role={profile?.role as Role | undefined}
       displayName={profile?.full_name ?? profile?.username ?? "student"}
       modules={modules}
       right={<SignOutButton />}

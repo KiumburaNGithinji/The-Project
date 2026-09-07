@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { canManage } from "@/lib/roles";
 
 const GUILD_ID = process.env.DISCORD_GUILD_ID;
 const COURSE_SLUG = process.env.DEFAULT_COURSE_SLUG ?? "day-trading";
@@ -65,7 +66,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(`${origin}/pending?reason=no_course`);
   }
 
-  // Mentors are always in; students must be in the Discord server.
+  // Staff are always in; students must be in the Discord server.
   const { data: profile } = await admin
     .from("profiles")
     .select("role")
@@ -73,7 +74,7 @@ export async function GET(request: NextRequest) {
     .maybeSingle();
 
   const allowed =
-    profile?.role === "mentor" ||
+    canManage(profile?.role) ||
     (providerToken ? await isGuildMember(providerToken) : !GUILD_ID);
 
   if (!allowed) {

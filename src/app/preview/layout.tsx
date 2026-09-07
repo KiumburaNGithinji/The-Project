@@ -5,7 +5,8 @@ export default function PreviewLayout({ children }: LayoutProps<"/preview">) {
   return (
     <AppShell
       basePath="/preview"
-      isMentor
+      isStaff
+      role="mentor"
       displayName="Preview User"
       modules={[
         {

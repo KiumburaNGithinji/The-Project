@@ -5,6 +5,7 @@
 import type { Assignment, QuizQuestion, Submission } from "@/lib/types";
 import type {
   CourseModuleRow,
+  MemberRow,
   RosterRow,
   StudentLectureRow,
   StudentSubmissionRow,
@@ -331,3 +332,54 @@ export function previewStudent(id: string) {
 
   return { name: NAMES[idx] ?? "Student", lectures, submissions };
 }
+
+/** The signed-in person on the preview settings screen. */
+export const PREVIEW_VIEWER_ID = "preview-you";
+
+export const MEMBERS: MemberRow[] = [
+  {
+    id: "preview-mentor",
+    username: "osman",
+    fullName: "Osman",
+    discordId: "204418291049234432",
+    role: "mentor",
+    enrolled: true,
+    joinedAt: "2026-08-14T09:00:00Z",
+  },
+  {
+    id: PREVIEW_VIEWER_ID,
+    username: "kayg17",
+    fullName: "Kiumbura",
+    discordId: "1138290540417392660",
+    role: "engineer",
+    enrolled: true,
+    joinedAt: "2026-08-14T09:04:00Z",
+  },
+  {
+    id: "preview-student-1",
+    username: "dmitri",
+    fullName: "Dmitri Vance",
+    discordId: "418290145562190345",
+    role: "student",
+    enrolled: true,
+    joinedAt: "2026-08-19T18:22:00Z",
+  },
+  {
+    id: "preview-student-2",
+    username: "renata",
+    fullName: "Renata Okafor",
+    discordId: "552190348871224019",
+    role: "student",
+    enrolled: true,
+    joinedAt: "2026-08-21T11:40:00Z",
+  },
+  {
+    id: "preview-student-3",
+    username: "tobias",
+    fullName: "Tobias Lind",
+    discordId: "331902458812309771",
+    role: "student",
+    enrolled: false,
+    joinedAt: "2026-09-02T20:11:00Z",
+  },
+];

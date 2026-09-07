@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { canManage } from "@/lib/roles";
 import { planMove, type SwapPlan } from "@/lib/reorder";
 import type { AssignmentKind } from "@/lib/types";
 
@@ -22,7 +23,8 @@ async function requireMentor() {
     .eq("id", user.id)
     .maybeSingle();
 
-  if (profile?.role !== "mentor") return { error: "Mentors only." as const };
+  if (!canManage(profile?.role))
+    return { error: "Mentors and engineers only." as const };
   return { supabase };
 }
 

@@ -1,4 +1,4 @@
-import type { Assignment, QuizQuestion, Submission } from "@/lib/types";
+import type { Assignment, QuizQuestion, Role, Submission } from "@/lib/types";
 
 export type CourseLessonRow = {
   id: string;
@@ -158,4 +158,31 @@ export type HomeworkAdminViewProps = {
   moduleTitle: string;
   assignments: AdminAssignment[];
   demo?: boolean;
+};
+
+export type MemberRow = {
+  id: string;
+  username: string | null;
+  fullName: string | null;
+  discordId: string | null;
+  role: Role;
+  enrolled: boolean;
+  joinedAt: string;
+};
+
+export type SettingsTab = "members" | "course";
+
+export type SettingsViewProps = {
+  basePath?: string;
+  demo?: boolean;
+  tab: SettingsTab;
+  /** Whoever is looking — they cannot change their own role. */
+  viewerId: string;
+  members: MemberRow[];
+  course: {
+    id: string;
+    title: string;
+    description: string | null;
+    isPublished: boolean;
+  };
 };

@@ -1,5 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { canManage } from "@/lib/roles";
 import HomeworkAdminView from "@/components/views/HomeworkAdminView";
 import type { AdminAssignment, AdminQuestion } from "@/components/views/types";
 import type { AssignmentKind } from "@/lib/types";
@@ -46,7 +47,7 @@ export default async function LessonHomeworkPage({
     .select("role")
     .eq("id", user.id)
     .maybeSingle();
-  if (profile?.role !== "mentor") redirect("/");
+  if (!canManage(profile?.role)) redirect("/");
 
   const { data: lesson } = await supabase
     .from("lessons")

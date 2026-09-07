@@ -1,5 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { canManage } from "@/lib/roles";
 import StudentDetailView from "@/components/views/StudentDetailView";
 import type {
   StudentLectureRow,
@@ -29,7 +30,7 @@ export default async function StudentDetailPage({
     .select("role")
     .eq("id", user.id)
     .maybeSingle();
-  if (me?.role !== "mentor") redirect("/");
+  if (!canManage(me?.role)) redirect("/");
 
   const { data: student } = await supabase
     .from("profiles")

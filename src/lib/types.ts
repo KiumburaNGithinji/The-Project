@@ -1,4 +1,4 @@
-export type Role = "student" | "mentor";
+export type Role = "student" | "mentor" | "engineer";
 export type AssignmentKind = "screenshot" | "journal" | "quiz" | "checkbox";
 export type SubmissionStatus = "draft" | "submitted" | "reviewed";
 

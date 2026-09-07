@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { canManage } from "@/lib/roles";
 import { createClient } from "@/lib/supabase/server";
 import MentorRosterView from "@/components/views/MentorRosterView";
 import type { RosterRow } from "@/components/views/types";
@@ -17,7 +18,7 @@ export default async function MentorPage() {
     .select("role")
     .eq("id", user.id)
     .maybeSingle();
-  if (profile?.role !== "mentor") redirect("/");
+  if (!canManage(profile?.role)) redirect("/");
 
   const { data: course } = await supabase
     .from("courses")

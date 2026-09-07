@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { canManage } from "@/lib/roles";
 import { createClient } from "@/lib/supabase/server";
 import ManageView from "@/components/views/ManageView";
 import type { ManageModule, MoveTarget } from "@/components/views/types";
@@ -56,7 +57,7 @@ export default async function ManagePage() {
     .select("role")
     .eq("id", user.id)
     .maybeSingle();
-  if (profile?.role !== "mentor") redirect("/");
+  if (!canManage(profile?.role)) redirect("/");
 
   const { data: course } = await supabase
     .from("courses")
