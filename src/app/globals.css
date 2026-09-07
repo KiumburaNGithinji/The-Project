@@ -23,6 +23,12 @@
   --accent-soft: #14203f;     /* blue at low alpha over the base */
 
   --danger: #f23645;          /* the red on the SELL tag */
+
+  /* Watch progress and completion read as candle-white, not accent-blue —
+     they report state rather than inviting a click. */
+  --progress: #ffffff;
+  --progress-ink: #0a0c12;
+  --progress-track: rgb(255 255 255 / 0.25);
 }
 
 @theme inline {
@@ -39,6 +45,8 @@
   --color-accent-ink: var(--accent-ink);
   --color-accent-soft: var(--accent-soft);
   --color-danger: var(--danger);
+  --color-progress: var(--progress);
+  --color-progress-ink: var(--progress-ink);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }

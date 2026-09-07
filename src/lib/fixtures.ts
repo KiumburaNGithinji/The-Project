@@ -67,13 +67,15 @@ const HOMEWORK_ON = new Set([
 export const ALL: Seed[] = [...CORE, ...ADVANCED];
 
 export function previewModules(): CourseModuleRow[] {
-  const build = (seeds: Seed[], offset: number) =>
+  const build = (seeds: Seed[], offset: number, ordinalBase: number) =>
     seeds.map((s, i) => {
       const p = fakeProgress(i + offset);
       const hasHw = HOMEWORK_ON.has(s.slug);
       return {
         id: s.slug,
         title: s.title,
+        youtubeId: PREVIEW_VIDEO,
+        ordinal: ordinalBase + i + 1,
         durationSeconds: s.minutes * 60,
         percent: p.percent,
         completed: p.completed,
@@ -87,13 +89,13 @@ export function previewModules(): CourseModuleRow[] {
       id: "core",
       title: "The Project",
       description: "The full system, in order.",
-      lessons: build(CORE, 0),
+      lessons: build(CORE, 0, 0),
     },
     {
       id: "advanced",
       title: "Advanced",
       description: "Refinements once the core is second nature.",
-      lessons: build(ADVANCED, 99),
+      lessons: build(ADVANCED, 99, CORE.length),
     },
   ];
 }

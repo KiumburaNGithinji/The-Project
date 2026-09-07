@@ -20,7 +20,7 @@ function Bar({ done, total }: { done: number; total: number }) {
   return (
     <div className="flex items-center gap-2">
       <div className="h-[3px] w-24 overflow-hidden rounded-full bg-surface-2">
-        <div className="h-full rounded-full bg-accent" style={{ width: `${pct}%` }} />
+        <div className="h-full rounded-full bg-progress" style={{ width: `${pct}%` }} />
       </div>
       <span className="font-mono text-xs text-muted-dim">
         {done}/{total}

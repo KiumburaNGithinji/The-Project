@@ -1,7 +1,9 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import AppShell from "@/components/AppShell";
 import SignOutButton from "@/components/SignOutButton";
+
+const COURSE_SLUG = process.env.DEFAULT_COURSE_SLUG ?? "day-trading";
 
 export default async function AppLayout({ children }: LayoutProps<"/">) {
   const supabase = await createClient();
@@ -11,48 +13,38 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
 
   if (!user) redirect("/login");
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("id, username, full_name, avatar_url, role")
-    .eq("id", user.id)
-    .maybeSingle();
+  const [{ data: profile }, { data: course }] = await Promise.all([
+    supabase
+      .from("profiles")
+      .select("id, username, full_name, role")
+      .eq("id", user.id)
+      .maybeSingle(),
+    supabase
+      .from("courses")
+      .select("id, modules(id, title, position, lessons(id))")
+      .eq("slug", COURSE_SLUG)
+      .maybeSingle(),
+  ]);
 
-  const isMentor = profile?.role === "mentor";
+  type NavModule = {
+    id: string;
+    title: string;
+    position: number;
+    lessons: { id: string }[];
+  };
+
+  const modules = ((course?.modules ?? []) as NavModule[])
+    .sort((a, b) => a.position - b.position)
+    .map((m) => ({ id: m.id, title: m.title, count: (m.lessons ?? []).length }));
 
   return (
-    <div className="flex min-h-full flex-col">
-      <header className="border-b border-border bg-surface/60 backdrop-blur">
-        <div className="mx-auto flex w-full max-w-6xl items-center gap-6 px-6 py-3">
-          <Link href="/" className="text-sm font-semibold tracking-tight">
-            The Project
-          </Link>
-
-          <nav className="flex items-center gap-4 text-sm text-muted">
-            <Link href="/" className="hover:text-foreground">
-              Course
-            </Link>
-            {isMentor && (
-              <Link href="/mentor" className="hover:text-foreground">
-                Students
-              </Link>
-            )}
-          </nav>
-
-          <div className="ml-auto flex items-center gap-3">
-            {isMentor && (
-              <span className="rounded-full border border-border-strong px-2 py-0.5 font-mono text-[10px] uppercase tracking-wide text-muted">
-                mentor
-              </span>
-            )}
-            <span className="text-sm text-muted">
-              {profile?.full_name ?? profile?.username ?? "student"}
-            </span>
-            <SignOutButton />
-          </div>
-        </div>
-      </header>
-
-      <main className="mx-auto w-full max-w-6xl flex-1 px-6 py-8">{children}</main>
-    </div>
+    <AppShell
+      isMentor={profile?.role === "mentor"}
+      displayName={profile?.full_name ?? profile?.username ?? "student"}
+      modules={modules}
+      right={<SignOutButton />}
+    >
+      {children}
+    </AppShell>
   );
 }

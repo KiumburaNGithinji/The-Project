@@ -188,7 +188,7 @@ export default function LessonPlayer({
       <div className="mt-3 flex items-center gap-3">
         <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-surface-2">
           <div
-            className="h-full rounded-full bg-accent transition-[width] duration-500"
+            className="h-full rounded-full bg-progress transition-[width] duration-500"
             style={{ width: `${Math.min(100, percent)}%` }}
           />
         </div>

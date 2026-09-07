@@ -14,7 +14,11 @@ type RawModule = {
   lessons: Lesson[];
 };
 
-export default async function CoursePage() {
+export default async function CoursePage({ searchParams }: PageProps<"/">) {
+  const sp = await searchParams;
+  const query = typeof sp.q === "string" ? sp.q : "";
+  const filter = typeof sp.f === "string" ? sp.f : "all";
+
   const supabase = await createClient();
   const {
     data: { user },
@@ -60,7 +64,7 @@ export default async function CoursePage() {
       .map((s) => s.assignment_id as string),
   );
 
-  const modules: CourseModuleRow[] = ((course.modules ?? []) as RawModule[])
+  const ordered = ((course.modules ?? []) as RawModule[])
     .sort((a, b) => a.position - b.position)
     .map((m) => ({
       id: m.id,
@@ -68,25 +72,43 @@ export default async function CoursePage() {
       description: m.description,
       lessons: [...(m.lessons ?? [])]
         .filter((l) => l.is_published)
-        .sort((a, b) => a.position - b.position)
-        .map((l) => {
-          const hw = assignmentsByLesson.get(l.id) ?? [];
-          return {
-            id: l.id,
-            title: l.title,
-            durationSeconds: l.duration_seconds,
-            percent: Number(progress.get(l.id)?.percent_watched ?? 0),
-            completed: Boolean(progress.get(l.id)?.completed_at),
-            homeworkTotal: hw.length,
-            homeworkDone: hw.filter((a) => doneAssignments.has(a.id)).length,
-          };
-        }),
+        .sort((a, b) => a.position - b.position),
     }));
+
+  // Cards are numbered across the whole course, so the ordinal continues from
+  // one module into the next rather than restarting.
+  const modules: CourseModuleRow[] = ordered.map((m, mi) => {
+    const offset = ordered
+      .slice(0, mi)
+      .reduce((n, prev) => n + prev.lessons.length, 0);
+
+    return {
+      id: m.id,
+      title: m.title,
+      description: m.description,
+      lessons: m.lessons.map((l, li) => {
+        const hw = assignmentsByLesson.get(l.id) ?? [];
+        return {
+          id: l.id,
+          title: l.title,
+          youtubeId: l.youtube_id,
+          ordinal: offset + li + 1,
+          durationSeconds: l.duration_seconds,
+          percent: Number(progress.get(l.id)?.percent_watched ?? 0),
+          completed: Boolean(progress.get(l.id)?.completed_at),
+          homeworkTotal: hw.length,
+          homeworkDone: hw.filter((a) => doneAssignments.has(a.id)).length,
+        };
+      }),
+    };
+  });
 
   const allLessons = modules.flatMap((m) => m.lessons);
 
   return (
     <CourseView
+      query={query}
+      filter={filter}
       title={course.title}
       description={course.description}
       modules={modules}

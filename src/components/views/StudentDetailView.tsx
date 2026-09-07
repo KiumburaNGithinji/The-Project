@@ -31,7 +31,7 @@ export default function StudentDetailView({
               <span
                 className={`grid h-4 w-4 shrink-0 place-items-center rounded-full border text-[9px] ${
                   l.completed
-                    ? "border-accent bg-accent text-accent-ink"
+                    ? "border-progress bg-progress text-progress-ink"
                     : "border-border-strong text-transparent"
                 }`}
               >
@@ -41,7 +41,7 @@ export default function StudentDetailView({
               <span className="w-28">
                 <span className="block h-[3px] overflow-hidden rounded-full bg-surface-2">
                   <span
-                    className="block h-full rounded-full bg-accent"
+                    className="block h-full rounded-full bg-progress"
                     style={{ width: `${Math.min(100, l.percent)}%` }}
                   />
                 </span>

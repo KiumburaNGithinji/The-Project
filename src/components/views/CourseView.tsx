@@ -1,22 +1,27 @@
 import Link from "next/link";
-import type { CourseViewProps } from "./types";
+import LectureCard from "@/components/LectureCard";
+import type { CourseLessonRow, CourseViewProps } from "./types";
 
-function formatDuration(seconds: number | null) {
-  if (!seconds) return null;
-  const m = Math.round(seconds / 60);
-  return m >= 60 ? `${Math.floor(m / 60)}h ${m % 60}m` : `${m}m`;
-}
+type Flat = { lesson: CourseLessonRow; moduleId: string; moduleTitle: string };
 
-function Stat({ done, total, label }: { done: number; total: number; label: string }) {
-  return (
-    <div>
-      <div className="text-[11px] uppercase tracking-wide text-muted-dim">{label}</div>
-      <div className="font-mono text-sm">
-        {done}
-        <span className="text-muted-dim">/{total}</span>
-      </div>
-    </div>
-  );
+function matches(f: Flat, filter: string, query: string) {
+  if (query && !f.lesson.title.toLowerCase().includes(query.toLowerCase())) {
+    return false;
+  }
+  switch (filter) {
+    case "all":
+      return true;
+    case "in-progress":
+      return f.lesson.percent > 0 && !f.lesson.completed;
+    case "completed":
+      return f.lesson.completed;
+    case "not-started":
+      return f.lesson.percent === 0;
+    case "homework":
+      return f.lesson.homeworkTotal > 0;
+    default:
+      return f.moduleId === filter;
+  }
 }
 
 export default function CourseView({
@@ -28,96 +33,111 @@ export default function CourseView({
   homeworkDone,
   homeworkTotal,
   basePath = "",
+  query = "",
+  filter = "all",
 }: CourseViewProps) {
+  const flat: Flat[] = modules.flatMap((m) =>
+    m.lessons.map((lesson) => ({
+      lesson,
+      moduleId: m.id,
+      moduleTitle: m.title,
+    })),
+  );
+
+  const visible = flat.filter((f) => matches(f, filter, query));
+
+  const chips = [
+    { id: "all", label: "All" },
+    ...modules.map((m) => ({ id: m.id, label: m.title })),
+    { id: "in-progress", label: "Continue watching" },
+    { id: "completed", label: "Watched" },
+    { id: "not-started", label: "Not started" },
+    { id: "homework", label: "Has homework" },
+  ];
+
+  const home = basePath || "/";
+  const chipHref = (id: string) => {
+    const parts = [id === "all" ? null : `f=${id}`, query ? `q=${encodeURIComponent(query)}` : null]
+      .filter(Boolean)
+      .join("&");
+    return parts ? `${home}?${parts}` : home;
+  };
+
   return (
     <div>
-      <div className="flex flex-wrap items-end justify-between gap-4">
+      {/* Chip rail — scrolls sideways on narrow screens, like YouTube's. */}
+      <div className="-mx-4 mb-5 flex gap-2 overflow-x-auto px-4 pb-1 sm:-mx-6 sm:px-6">
+        {chips.map((c) => {
+          const active = filter === c.id;
+          return (
+            <Link
+              key={c.id}
+              href={chipHref(c.id)}
+              className={`shrink-0 rounded-lg px-3 py-1.5 text-sm transition ${
+                active
+                  ? "bg-foreground font-medium text-background"
+                  : "bg-surface-2 text-foreground hover:bg-border"
+              }`}
+            >
+              {c.label}
+            </Link>
+          );
+        })}
+      </div>
+
+      <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
-          {description && (
-            <p className="mt-1 max-w-2xl text-sm text-muted">{description}</p>
+          <h1 className="text-xl font-semibold tracking-tight">{title}</h1>
+          {description && !query && (
+            <p className="mt-0.5 text-sm text-muted">{description}</p>
+          )}
+          {query && (
+            <p className="mt-0.5 text-sm text-muted">
+              {visible.length} result{visible.length === 1 ? "" : "s"} for “{query}”
+            </p>
           )}
         </div>
-        <div className="flex gap-8">
-          <Stat done={lecturesDone} total={lecturesTotal} label="lectures" />
-          <Stat done={homeworkDone} total={homeworkTotal} label="homework" />
+
+        <div className="flex gap-6 font-mono text-sm">
+          <div>
+            <div className="text-[11px] uppercase tracking-wide text-muted-dim">
+              lectures
+            </div>
+            <div>
+              {lecturesDone}
+              <span className="text-muted-dim">/{lecturesTotal}</span>
+            </div>
+          </div>
+          <div>
+            <div className="text-[11px] uppercase tracking-wide text-muted-dim">
+              homework
+            </div>
+            <div>
+              {homeworkDone}
+              <span className="text-muted-dim">/{homeworkTotal}</span>
+            </div>
+          </div>
         </div>
       </div>
 
-      {modules.length === 0 && (
-        <p className="mt-10 rounded-lg border border-border bg-surface p-6 text-sm text-muted">
-          No lectures have been added yet.
+      {visible.length === 0 ? (
+        <p className="rounded-lg border border-border bg-surface p-8 text-center text-sm text-muted">
+          {query
+            ? `No lectures match “${query}”.`
+            : "Nothing here yet."}
         </p>
+      ) : (
+        <div className="grid grid-cols-1 gap-x-4 gap-y-7 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+          {visible.map((f) => (
+            <LectureCard
+              key={f.lesson.id}
+              lesson={f.lesson}
+              moduleTitle={f.moduleTitle}
+              basePath={basePath}
+            />
+          ))}
+        </div>
       )}
-
-      <div className="mt-8 space-y-8">
-        {modules.map((m) => (
-          <section key={m.id}>
-            <h2 className="text-xs font-medium uppercase tracking-[0.14em] text-muted">
-              {m.title}
-            </h2>
-            {m.description && (
-              <p className="mt-1 text-sm text-muted-dim">{m.description}</p>
-            )}
-
-            <ul className="mt-3 divide-y divide-border overflow-hidden rounded-lg border border-border bg-surface">
-              {m.lessons.map((l) => (
-                <li key={l.id}>
-                  <Link
-                    href={`${basePath}/lessons/${l.id}`}
-                    className="flex items-center gap-4 px-4 py-3 transition hover:bg-surface-2"
-                  >
-                    {/* Filled = complete, hollow = not. No color involved. */}
-                    <span
-                      className={`grid h-5 w-5 shrink-0 place-items-center rounded-full border text-[10px] ${
-                        l.completed
-                          ? "border-accent bg-accent text-accent-ink"
-                          : "border-border-strong text-transparent"
-                      }`}
-                    >
-                      ✓
-                    </span>
-
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm">{l.title}</span>
-                      <span className="mt-0.5 flex items-center gap-3 text-xs text-muted-dim">
-                        {formatDuration(l.durationSeconds) && (
-                          <span className="font-mono">
-                            {formatDuration(l.durationSeconds)}
-                          </span>
-                        )}
-                        {l.homeworkTotal > 0 && (
-                          <span
-                            className={
-                              l.homeworkDone === l.homeworkTotal
-                                ? "text-foreground"
-                                : undefined
-                            }
-                          >
-                            homework {l.homeworkDone}/{l.homeworkTotal}
-                          </span>
-                        )}
-                      </span>
-                    </span>
-
-                    <span className="hidden w-32 items-center gap-2 sm:flex">
-                      <span className="block h-[3px] flex-1 overflow-hidden rounded-full bg-surface-2">
-                        <span
-                          className="block h-full rounded-full bg-accent"
-                          style={{ width: `${Math.min(100, l.percent)}%` }}
-                        />
-                      </span>
-                      <span className="w-8 shrink-0 text-right font-mono text-[10px] text-muted-dim">
-                        {Math.floor(l.percent)}%
-                      </span>
-                    </span>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </section>
-        ))}
-      </div>
     </div>
   );
 }

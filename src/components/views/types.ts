@@ -3,6 +3,9 @@ import type { Assignment, QuizQuestion, Submission } from "@/lib/types";
 export type CourseLessonRow = {
   id: string;
   title: string;
+  youtubeId: string;
+  /** 1-based position across the whole course, shown on the card. */
+  ordinal: number;
   durationSeconds: number | null;
   percent: number;
   completed: boolean;
@@ -27,6 +30,10 @@ export type CourseViewProps = {
   homeworkTotal: number;
   /** "" for the real app, "/preview" for the fixture walkthrough. */
   basePath?: string;
+  /** Free-text search from the top bar. */
+  query?: string;
+  /** Active filter chip: "all", a module id, or a progress state. */
+  filter?: string;
 };
 
 export type LessonViewProps = {
