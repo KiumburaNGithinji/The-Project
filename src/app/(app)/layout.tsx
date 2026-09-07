@@ -17,7 +17,7 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
   const [{ data: profile }, { data: course }] = await Promise.all([
     supabase
       .from("profiles")
-      .select("id, username, full_name, avatar_url, role")
+      .select("id, username, full_name, avatar_url, role, onboarded_at")
       .eq("id", user.id)
       .maybeSingle(),
     supabase
@@ -26,6 +26,8 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
       .eq("slug", COURSE_SLUG)
       .maybeSingle(),
   ]);
+
+  if (profile && !profile.onboarded_at) redirect("/welcome");
 
   type RawNav = {
     id: string;
