@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { canManage } from "@/lib/roles";
 import { hasVideo, parseYouTubeId } from "@/lib/youtube";
-import { planMove, type SwapPlan } from "@/lib/reorder";
+import { planMove, planReorder, type SwapPlan } from "@/lib/reorder";
 
 type Result = { ok?: true; error?: string };
 
@@ -207,10 +207,10 @@ export async function deleteLesson(lessonId: string): Promise<Result> {
   return error ? { error: error.message } : done();
 }
 
-/** Move a lecture one slot within its section or topic. */
-export async function moveLesson(
+/** Drop a lecture at `toIndex` within its section or topic. */
+export async function reorderLesson(
   lessonId: string,
-  direction: "up" | "down",
+  toIndex: number,
 ): Promise<Result> {
   const gate = await requireMentor();
   if (gate.error) return { error: gate.error };
@@ -224,8 +224,6 @@ export async function moveLesson(
 
   if (!self) return { error: "Lecture not found." };
 
-  // Plan against the full sibling list, so the move always matches the order
-  // on screen even if positions have tied or left gaps.
   const { data: siblings } = await supabase
     .from("lessons")
     .select("id, position")
@@ -234,7 +232,7 @@ export async function moveLesson(
   return applyPlan(
     supabase,
     "lessons",
-    planMove(siblings ?? [], lessonId, direction),
+    planReorder(siblings ?? [], lessonId, toIndex),
   );
 }
 

@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import LessonRow from "./LessonRow";
+import { useRef, useState, useTransition } from "react";
+import LessonRow, { type RowDrag } from "./LessonRow";
 import {
   addLesson,
   addModule,
   deleteModule,
   moveModule,
+  reorderLesson,
   renameModule,
 } from "@/app/(app)/manage/actions";
 import { hasVideo } from "@/lib/youtube";
@@ -34,7 +35,7 @@ export default function ModuleBlock({
   isLast,
   depth = 0,
   demo = false,
-  onDemoMoveLesson,
+  onDemoReorderLesson,
   onDemoMoveModule,
 }: {
   module: ManageModule;
@@ -45,7 +46,7 @@ export default function ModuleBlock({
   isLast: boolean;
   depth?: number;
   demo?: boolean;
-  onDemoMoveLesson?: (id: string, direction: "up" | "down") => void;
+  onDemoReorderLesson?: (id: string, toIndex: number) => void;
   onDemoMoveModule?: (id: string, direction: "up" | "down") => void;
 }) {
   const [title, setTitle] = useState(module.title);
@@ -55,6 +56,87 @@ export default function ModuleBlock({
   const [err, setErr] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
   const [pending, start] = useTransition();
+
+  // Drag and drop over the lecture list. Native HTML5 dragging rather than a
+  // library: it is one vertical list, and a dependency here would outweigh it.
+  const grippedRef = useRef(false);
+  const [dragId, setDragId] = useState<string | null>(null);
+  const [overId, setOverId] = useState<string | null>(null);
+  const [overSide, setOverSide] = useState<"above" | "below">("below");
+
+  function clearDrag() {
+    grippedRef.current = false;
+    setDragId(null);
+    setOverId(null);
+  }
+
+  /** Drop `id` where the indicator is showing, then persist the new order. */
+  function commit(id: string, targetId: string, side: "above" | "below") {
+    const ids = module.lessons.map((l) => l.id);
+    const from = ids.indexOf(id);
+    let to = ids.indexOf(targetId);
+    if (from < 0 || to < 0) return;
+
+    if (side === "below") to += 1;
+    if (from < to) to -= 1;
+    if (to === from) return;
+
+    move(id, to);
+  }
+
+  function move(id: string, toIndex: number) {
+    if (toIndex < 0 || toIndex >= module.lessons.length) return;
+
+    if (demo) {
+      onDemoReorderLesson?.(id, toIndex);
+      return;
+    }
+    start(async () => {
+      const r = await reorderLesson(id, toIndex);
+      if (r.error) {
+        setErr(true);
+        setMsg(r.error);
+      }
+    });
+  }
+
+  const rowDrag = (id: string, index: number): RowDrag => ({
+    isDragging: dragId === id,
+    dropSide: dragId && overId === id && dragId !== id ? overSide : null,
+    onGripDown: () => {
+      grippedRef.current = true;
+    },
+    onKeyMove: (direction) =>
+      move(id, direction === "up" ? index - 1 : index + 1),
+    handlers: {
+      onDragStart: (e) => {
+        // A drag that did not begin on the grip is someone selecting text in
+        // one of the inputs. Let them.
+        if (!grippedRef.current) {
+          e.preventDefault();
+          return;
+        }
+        e.dataTransfer.effectAllowed = "move";
+        e.dataTransfer.setData("text/plain", id);
+        setDragId(id);
+      },
+      onDragOver: (e) => {
+        if (!dragId) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = "move";
+        const box = e.currentTarget.getBoundingClientRect();
+        setOverId(id);
+        setOverSide(e.clientY < box.top + box.height / 2 ? "above" : "below");
+      },
+      onDrop: (e) => {
+        e.preventDefault();
+        const dragged = dragId ?? e.dataTransfer.getData("text/plain");
+        if (dragged && dragged !== id) commit(dragged, id, overSide);
+        clearDrag();
+      },
+      onDragEnd: clearDrag,
+    },
+  });
 
   const [linked, total] = countLinked(module);
   const isTopic = depth > 0;
@@ -161,12 +243,10 @@ export default function ModuleBlock({
               key={l.id}
               lesson={l}
               ordinal={ordinalBase + i + 1}
-              isFirst={i === 0}
-              isLast={i === module.lessons.length - 1}
               moduleId={module.id}
               moveTargets={moveTargets}
               demo={demo}
-              onDemoMove={onDemoMoveLesson}
+              drag={rowDrag(l.id, i)}
             />
           ))}
         </ul>
@@ -191,7 +271,7 @@ export default function ModuleBlock({
               isLast={i === module.children.length - 1}
               depth={depth + 1}
               demo={demo}
-              onDemoMoveLesson={onDemoMoveLesson}
+              onDemoReorderLesson={onDemoReorderLesson}
               onDemoMoveModule={onDemoMoveModule}
             />
           ))}

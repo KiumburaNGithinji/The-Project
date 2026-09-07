@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import ModuleBlock from "@/components/manage/ModuleBlock";
 import { addModule, publishAllLinked } from "@/app/(app)/manage/actions";
-import { shiftById } from "@/lib/reorder";
+import { moveToIndex, shiftById } from "@/lib/reorder";
 import { hasVideo } from "@/lib/youtube";
 import type { ManageViewProps } from "./types";
 
@@ -30,15 +30,15 @@ export default function ManageView({
     (l) => hasVideo(l.youtubeId) && !l.isPublished,
   ).length;
 
-  function demoMoveLesson(lessonId: string, direction: "up" | "down") {
+  function demoReorderLesson(lessonId: string, toIndex: number) {
     setTree((prev) =>
       prev.map((section) => {
-        const own = shiftById(section.lessons, lessonId, direction);
+        const own = moveToIndex(section.lessons, lessonId, toIndex);
         if (own) return { ...section, lessons: own };
         return {
           ...section,
           children: section.children.map((topic) => {
-            const moved = shiftById(topic.lessons, lessonId, direction);
+            const moved = moveToIndex(topic.lessons, lessonId, toIndex);
             return moved ? { ...topic, lessons: moved } : topic;
           }),
         };
@@ -153,7 +153,7 @@ export default function ManageView({
             moveTargets={moveTargets}
             isFirst={i === 0}
             isLast={i === list.length - 1}
-            onDemoMoveLesson={demoMoveLesson}
+            onDemoReorderLesson={demoReorderLesson}
             onDemoMoveModule={demoMoveModule}
             ordinalBase={list
               .slice(0, i)

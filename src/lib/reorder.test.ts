@@ -1,6 +1,13 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { byPosition, planMove, shiftById, type Ordered } from "./reorder.ts";
+import {
+  byPosition,
+  moveToIndex,
+  planMove,
+  planReorder,
+  shiftById,
+  type Ordered,
+} from "./reorder.ts";
 
 /** Apply a plan and read back the resulting order, the way the UI would. */
 function apply(rows: Ordered[], id: string, dir: "up" | "down") {
@@ -102,5 +109,80 @@ describe("planMove", () => {
       list = [...next.values()];
     }
     assert.equal([...list].sort(byPosition).map((r) => r.id).join(","), "d,a,b,c");
+  });
+});
+
+describe("drag and drop", () => {
+  it("moveToIndex drags a row down the list", () => {
+    const list = [{ id: "a" }, { id: "b" }, { id: "c" }, { id: "d" }];
+    assert.deepEqual(moveToIndex(list, "a", 2), [
+      { id: "b" },
+      { id: "c" },
+      { id: "a" },
+      { id: "d" },
+    ]);
+  });
+
+  it("moveToIndex drags a row up the list", () => {
+    const list = [{ id: "a" }, { id: "b" }, { id: "c" }];
+    assert.deepEqual(moveToIndex(list, "c", 0), [
+      { id: "c" },
+      { id: "a" },
+      { id: "b" },
+    ]);
+  });
+
+  it("moveToIndex clamps a drop past the end", () => {
+    const list = [{ id: "a" }, { id: "b" }];
+    assert.deepEqual(moveToIndex(list, "a", 99), [{ id: "b" }, { id: "a" }]);
+  });
+
+  it("moveToIndex returns null when nothing moves", () => {
+    const list = [{ id: "a" }, { id: "b" }];
+    assert.equal(moveToIndex(list, "a", 0), null);
+    assert.equal(moveToIndex(list, "missing", 1), null);
+  });
+
+  it("planReorder writes only the rows that actually shift", () => {
+    const rows = [
+      { id: "a", position: 1 },
+      { id: "b", position: 2 },
+      { id: "c", position: 3 },
+      { id: "d", position: 4 },
+    ];
+    const plan = planReorder(rows, "a", 2);
+    assert.equal(plan.kind, "renumber");
+    if (plan.kind !== "renumber") return;
+    // d never moves, so it is never written.
+    assert.deepEqual(plan.rows, [
+      { id: "b", position: 1 },
+      { id: "c", position: 2 },
+      { id: "a", position: 3 },
+    ]);
+  });
+
+  it("planReorder repairs tied positions on the way past", () => {
+    const rows = [
+      { id: "a", position: 1 },
+      { id: "b", position: 1 },
+      { id: "c", position: 1 },
+    ];
+    const plan = planReorder(rows, "c", 0);
+    assert.equal(plan.kind, "renumber");
+    if (plan.kind !== "renumber") return;
+    // c lands on position 1, which it already held: moving a and b out from
+    // under it is enough to put c first, so c needs no write of its own.
+    assert.deepEqual(plan.rows, [
+      { id: "a", position: 2 },
+      { id: "b", position: 3 },
+    ]);
+  });
+
+  it("planReorder does nothing when the drop changes no order", () => {
+    const rows = [
+      { id: "a", position: 1 },
+      { id: "b", position: 2 },
+    ];
+    assert.equal(planReorder(rows, "a", 0).kind, "none");
   });
 });

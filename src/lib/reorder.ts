@@ -1,5 +1,5 @@
 /**
- * Reordering helpers shared by the mentor editor's up/down arrows.
+ * Reordering helpers shared by the mentor editor's drag-and-drop list.
  *
  * Everything works on the rendered array rather than raw `position` numbers,
  * so the result always matches the order the mentor is actually looking at —
@@ -73,4 +73,47 @@ export function planMove<T extends Ordered>(
     a: { id: a.id, position: b.position },
     b: { id: b.id, position: a.position },
   };
+}
+
+/**
+ * Move `id` to `toIndex` in the rendered order. Returns a new array, or null
+ * when nothing would change (or the item isn't in the list).
+ */
+export function moveToIndex<T extends { id: string }>(
+  list: T[],
+  id: string,
+  toIndex: number,
+): T[] | null {
+  const from = list.findIndex((x) => x.id === id);
+  if (from < 0) return null;
+
+  const to = Math.max(0, Math.min(list.length - 1, toIndex));
+  if (to === from) return null;
+
+  const next = [...list];
+  const [item] = next.splice(from, 1);
+  next.splice(to, 0, item);
+  return next;
+}
+
+/**
+ * Plan a drag. A drop can land anywhere in the list, so there is no two-row
+ * swap to be clever about: renumber the siblings sequentially and write only
+ * the rows whose position actually changed — usually a handful, not the lot.
+ */
+export function planReorder<T extends Ordered>(
+  siblings: T[],
+  id: string,
+  toIndex: number,
+): SwapPlan {
+  const ordered = [...siblings].sort(byPosition);
+  const next = moveToIndex(ordered, id, toIndex);
+  if (!next) return { kind: "none" };
+
+  const was = new Map(ordered.map((row) => [row.id, row.position]));
+  const rows = next
+    .map((row, i) => ({ id: row.id, position: i + 1 }))
+    .filter((row) => was.get(row.id) !== row.position);
+
+  return rows.length ? { kind: "renumber", rows } : { kind: "none" };
 }

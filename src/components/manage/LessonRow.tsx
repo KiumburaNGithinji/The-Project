@@ -6,7 +6,6 @@ import { useRef, useState, useTransition } from "react";
 import { createClient } from "@/lib/supabase/client";
 import {
   deleteLesson,
-  moveLesson,
   moveLessonToModule,
   renameLesson,
   setLessonPublished,
@@ -20,24 +19,31 @@ import type { ManageLesson, MoveTarget } from "@/components/views/types";
 const iconBtn =
   "grid h-7 w-7 place-items-center rounded-md border border-border text-muted transition hover:border-border-strong hover:text-foreground disabled:opacity-30";
 
+/** Everything the parent list needs to make this row draggable. */
+export type RowDrag = {
+  isDragging: boolean;
+  dropSide: "above" | "below" | null;
+  /** Arms the drag: a drag that did not start on the grip is cancelled. */
+  onGripDown: () => void;
+  /** Keyboard equivalent, so reordering does not require a pointer. */
+  onKeyMove: (direction: "up" | "down") => void;
+  handlers: React.DOMAttributes<HTMLLIElement>;
+};
+
 export default function LessonRow({
   lesson,
   ordinal,
-  isFirst,
-  isLast,
   moduleId,
   moveTargets,
+  drag,
   demo = false,
-  onDemoMove,
 }: {
   lesson: ManageLesson;
   ordinal: number;
-  isFirst: boolean;
-  isLast: boolean;
   moduleId: string;
   moveTargets: MoveTarget[];
+  drag?: RowDrag;
   demo?: boolean;
-  onDemoMove?: (id: string, direction: "up" | "down") => void;
 }) {
   const linked = hasVideo(lesson.youtubeId);
 
@@ -112,7 +118,31 @@ export default function LessonRow({
   }
 
   return (
-    <li className="flex gap-3 px-3 py-3">
+    <li
+      draggable={Boolean(drag)}
+      {...(drag?.handlers ?? {})}
+      className={`flex gap-3 px-3 py-3 transition ${
+        drag?.isDragging ? "opacity-40" : ""
+      } ${drag?.dropSide === "above" ? "border-t-2 border-t-accent" : ""} ${
+        drag?.dropSide === "below" ? "border-b-2 border-b-accent" : ""
+      }`}
+    >
+      {drag && (
+        <button
+          type="button"
+          aria-label={`Reorder ${lesson.title}. Use the arrow keys to move it.`}
+          onPointerDown={drag.onGripDown}
+          onKeyDown={(e) => {
+            if (e.key === "ArrowUp" || e.key === "ArrowDown") {
+              e.preventDefault();
+              drag.onKeyMove(e.key === "ArrowUp" ? "up" : "down");
+            }
+          }}
+          className="mt-1 h-7 w-5 shrink-0 cursor-grab select-none rounded text-center font-mono text-sm leading-7 text-muted-dim transition hover:text-foreground active:cursor-grabbing"
+        >
+          ⠿
+        </button>
+      )}
       <div className="shrink-0">
         <button
           type="button"
@@ -180,32 +210,6 @@ export default function LessonRow({
             className="min-w-0 flex-1 rounded-md border border-transparent bg-transparent px-2 py-1 text-sm font-medium outline-none hover:border-border focus:border-border-strong focus:bg-background"
           />
 
-          <button
-            type="button"
-            aria-label="Move up"
-            disabled={isFirst || pending}
-            onClick={() =>
-              demo && onDemoMove
-                ? onDemoMove(lesson.id, "up")
-                : run(() => moveLesson(lesson.id, "up"), "Moved.")
-            }
-            className={iconBtn}
-          >
-            ↑
-          </button>
-          <button
-            type="button"
-            aria-label="Move down"
-            disabled={isLast || pending}
-            onClick={() =>
-              demo && onDemoMove
-                ? onDemoMove(lesson.id, "down")
-                : run(() => moveLesson(lesson.id, "down"), "Moved.")
-            }
-            className={iconBtn}
-          >
-            ↓
-          </button>
 
           <label className="flex cursor-pointer select-none items-center gap-1.5 rounded-md border border-border px-2 py-1 text-xs text-muted">
             <input
