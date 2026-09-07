@@ -8,6 +8,8 @@ export default function PreviewLayout({ children }: LayoutProps<"/preview">) {
       isStaff
       role="mentor"
       displayName="Preview User"
+      username="preview"
+      demo
       modules={[
         {
           id: "core",

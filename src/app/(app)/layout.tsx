@@ -3,7 +3,6 @@ import { createClient } from "@/lib/supabase/server";
 import AppShell from "@/components/AppShell";
 import { canManage } from "@/lib/roles";
 import type { Role } from "@/lib/types";
-import SignOutButton from "@/components/SignOutButton";
 
 const COURSE_SLUG = process.env.DEFAULT_COURSE_SLUG ?? "day-trading";
 
@@ -18,7 +17,7 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
   const [{ data: profile }, { data: course }] = await Promise.all([
     supabase
       .from("profiles")
-      .select("id, username, full_name, role")
+      .select("id, username, full_name, avatar_url, role")
       .eq("id", user.id)
       .maybeSingle(),
     supabase
@@ -62,8 +61,9 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
       isStaff={canManage(profile?.role)}
       role={profile?.role as Role | undefined}
       displayName={profile?.full_name ?? profile?.username ?? "student"}
+      username={profile?.username ?? null}
+      avatarUrl={profile?.avatar_url ?? null}
       modules={modules}
-      right={<SignOutButton />}
     >
       {children}
     </AppShell>

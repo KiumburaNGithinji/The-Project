@@ -15,6 +15,8 @@ const nextConfig: NextConfig = {
       // Lecture thumbnails come straight from YouTube. These URLs resolve for
       // unlisted videos too, so no upload step is needed.
       { protocol: "https", hostname: "i.ytimg.com" },
+      // Discord avatars, captured into profiles.avatar_url on first sign-in.
+      { protocol: "https", hostname: "cdn.discordapp.com" },
       // Custom thumbnails the mentor uploads.
       ...(supabaseHost
         ? [{ protocol: "https" as const, hostname: supabaseHost }]

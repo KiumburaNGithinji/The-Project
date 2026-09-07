@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Suspense, type ReactNode } from "react";
 import SearchBar from "@/components/SearchBar";
+import ProfileMenu from "@/components/ProfileMenu";
 import { ROLE_LABELS } from "@/lib/roles";
 import type { Role } from "@/lib/types";
 
@@ -16,9 +17,11 @@ export default function AppShell({
   isStaff,
   role,
   displayName,
+  username = null,
+  avatarUrl = null,
+  demo = false,
   modules,
   banner,
-  right,
   children,
 }: {
   basePath?: string;
@@ -26,9 +29,12 @@ export default function AppShell({
   /** Drives the badge only — access is decided by isStaff. */
   role?: Role;
   displayName: string;
+  username?: string | null;
+  avatarUrl?: string | null;
+  /** Preview: the menu renders, but signing out is inert. */
+  demo?: boolean;
   modules: NavModule[];
   banner?: ReactNode;
-  right?: ReactNode;
   children: ReactNode;
 }) {
   const home = basePath || "/";
@@ -64,8 +70,14 @@ export default function AppShell({
                 {ROLE_LABELS[role].toLowerCase()}
               </span>
             )}
-            <span className="hidden text-sm text-muted md:inline">{displayName}</span>
-            {right}
+            <ProfileMenu
+              name={displayName}
+              username={username}
+              avatarUrl={avatarUrl}
+              role={role}
+              basePath={basePath}
+              demo={demo}
+            />
           </div>
         </div>
       </header>
