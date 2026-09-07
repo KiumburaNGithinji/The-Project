@@ -1,6 +1,6 @@
 export type Role = "student" | "mentor" | "engineer";
 export type AssignmentKind = "screenshot" | "journal" | "quiz" | "checkbox";
-export type SubmissionStatus = "draft" | "submitted" | "reviewed";
+export type SubmissionStatus = "draft" | "submitted" | "approved" | "returned";
 
 export type Profile = {
   id: string;

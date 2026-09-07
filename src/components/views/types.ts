@@ -1,4 +1,17 @@
-import type { Assignment, QuizQuestion, Role, Submission } from "@/lib/types";
+import type {
+  Assignment,
+  QuizQuestion,
+  Role,
+  Submission,
+  SubmissionStatus,
+} from "@/lib/types";
+
+/**
+ * Where a lecture sits on the pathway. "current" is the one lecture a student
+ * is allowed to work on; everything before it is replayable, everything after
+ * is shut until its homework is approved.
+ */
+export type LessonState = "done" | "current" | "locked";
 
 export type CourseLessonRow = {
   id: string;
@@ -11,7 +24,14 @@ export type CourseLessonRow = {
   percent: number;
   completed: boolean;
   homeworkTotal: number;
+  /** Approved by the mentor — not merely handed in. */
   homeworkDone: number;
+  state: LessonState;
+  homeworkPending: number;
+  homeworkReturned: number;
+  /** 24h after the lecture was finished, while homework is outstanding. */
+  dueAt: string | null;
+  overdue: boolean;
 };
 
 export type CourseModuleRow = {
@@ -59,6 +79,8 @@ export type LessonViewProps = {
   userId: string;
   prev: { id: string; title: string } | null;
   next: { id: string; title: string } | null;
+  /** The pathway has not opened it yet — shown, but not a link. */
+  nextLocked?: boolean;
 };
 
 export type RosterRow = {
@@ -69,6 +91,8 @@ export type RosterRow = {
   lessons_completed: number;
   assignments_total: number;
   assignments_submitted: number;
+  /** Handed in and waiting on the mentor. Nobody advances until it clears. */
+  awaiting_review: number;
   last_active_at: string | null;
 };
 
@@ -86,6 +110,7 @@ export type StudentLectureRow = {
 
 export type StudentSubmissionRow = {
   id: string;
+  status: SubmissionStatus;
   assignmentTitle: string;
   kind: Assignment["kind"];
   submittedAt: string;

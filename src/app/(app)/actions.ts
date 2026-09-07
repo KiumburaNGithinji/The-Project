@@ -87,16 +87,39 @@ export async function gradeQuiz(
   return { ok: true, result: data as QuizResult };
 }
 
-export async function saveFeedback(submissionId: string, feedback: string) {
+/**
+ * The mentor's verdict. Approving is what moves a student down the pathway, so
+ * the database checks the caller too — a trigger on submissions refuses these
+ * statuses from anyone who is not staff, whatever this action believes.
+ */
+export async function reviewSubmission(
+  submissionId: string,
+  decision: "approved" | "returned",
+  feedback: string,
+) {
   const { supabase } = await requireUser();
 
   const { error } = await supabase
     .from("submissions")
     .update({
-      mentor_feedback: feedback,
-      status: "reviewed",
+      mentor_feedback: feedback.trim() || null,
+      status: decision,
       reviewed_at: new Date().toISOString(),
     })
+    .eq("id", submissionId);
+
+  if (error) return { error: error.message };
+  revalidatePath("/", "layout");
+  return { ok: true };
+}
+
+/** Feedback without a verdict — leaves the submission where it is. */
+export async function saveFeedback(submissionId: string, feedback: string) {
+  const { supabase } = await requireUser();
+
+  const { error } = await supabase
+    .from("submissions")
+    .update({ mentor_feedback: feedback.trim() || null })
     .eq("id", submissionId);
 
   if (error) return { error: error.message };

@@ -18,6 +18,7 @@ export default function LessonView({
   userId,
   prev,
   next,
+  nextLocked = false,
 }: LessonViewProps) {
   return (
     <div>
@@ -75,12 +76,21 @@ export default function LessonView({
           <span />
         )}
         {next ? (
-          <Link
-            href={`${basePath}/lessons/${next.id}`}
-            className="text-muted hover:text-foreground"
-          >
-            {next.title} →
-          </Link>
+          nextLocked ? (
+            <span
+              title="Finish this lecture and get its homework approved."
+              className="cursor-not-allowed text-muted-dim"
+            >
+              {next.title} · locked
+            </span>
+          ) : (
+            <Link
+              href={`${basePath}/lessons/${next.id}`}
+              className="text-muted hover:text-foreground"
+            >
+              {next.title} →
+            </Link>
+          )
         ) : (
           <span />
         )}

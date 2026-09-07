@@ -5,6 +5,7 @@
 import type { Assignment, QuizQuestion, Submission } from "@/lib/types";
 import type {
   CourseModuleRow,
+  LessonState,
   MemberRow,
   RosterRow,
   StudentLectureRow,
@@ -61,12 +62,6 @@ export const ADVANCED: Seed[] = [
 ];
 
 /** Deterministic pretend progress: the first stretch done, one mid-lecture. */
-function fakeProgress(index: number): { percent: number; completed: boolean } {
-  if (index < 9) return { percent: 100, completed: true };
-  if (index === 9) return { percent: 41, completed: false };
-  if (index === 10) return { percent: 8, completed: false };
-  return { percent: 0, completed: false };
-}
 
 const HOMEWORK_ON = new Set([
   "candles-timeframes",
@@ -82,22 +77,45 @@ export const ALL: Seed[] = [
   ...ADVANCED,
 ];
 
+/**
+ * Where the imaginary student has got to. Liquidity — the lecture the preview
+ * lesson page opens, and the one carrying all four homework kinds — is the one
+ * they are stuck on, waiting on their mentor. Everything after it is shut.
+ */
+const CURRENT_ORDINAL = 7;
+
 export function previewModules(): CourseModuleRow[] {
-  const build = (seeds: Seed[], progressOffset: number, ordinalBase: number) =>
+  const build = (seeds: Seed[], ordinalBase: number) =>
     seeds.map((s, i) => {
-      const p = fakeProgress(i + progressOffset);
+      const ordinal = ordinalBase + i + 1;
+      const state: LessonState =
+        ordinal < CURRENT_ORDINAL
+          ? "done"
+          : ordinal === CURRENT_ORDINAL
+            ? "current"
+            : "locked";
+
       const hasHw = HOMEWORK_ON.has(s.slug);
+      const total = hasHw ? (s.slug === "liquidity" ? 4 : 1) : 0;
+      const done = state === "done";
+      const current = state === "current";
+
       return {
         id: s.slug,
         title: s.title,
         youtubeId: PREVIEW_VIDEO,
         thumbnailPath: null,
-        ordinal: ordinalBase + i + 1,
+        ordinal,
         durationSeconds: s.minutes * 60,
-        percent: p.percent,
-        completed: p.completed,
-        homeworkTotal: hasHw ? (s.slug === "liquidity" ? 4 : 1) : 0,
-        homeworkDone: hasHw && p.completed ? (s.slug === "liquidity" ? 2 : 1) : 0,
+        percent: done || current ? 100 : 0,
+        completed: done || current,
+        homeworkTotal: total,
+        homeworkDone: done ? total : current ? 2 : 0,
+        state,
+        homeworkPending: current ? total - 2 : 0,
+        homeworkReturned: 0,
+        dueAt: null,
+        overdue: false,
       };
     });
 
@@ -108,14 +126,13 @@ export function previewModules(): CourseModuleRow[] {
       id: "core",
       title: "The Project",
       description: "The full system, in order.",
-      lessons: build(CORE, 0, 0),
+      lessons: build(CORE, 0),
       children: TOPICS.map((t, ti) => ({
         id: t.id,
         title: t.title,
         description: null,
         lessons: build(
           t.parts,
-          7,
           CORE.length + TOPICS.slice(0, ti).reduce((n, x) => n + x.parts.length, 0),
         ),
         children: [],
@@ -125,7 +142,7 @@ export function previewModules(): CourseModuleRow[] {
       id: "advanced",
       title: "Advanced",
       description: "Refinements once the core is second nature.",
-      lessons: build(ADVANCED, 99, CORE.length + topicParts),
+      lessons: build(ADVANCED, CORE.length + topicParts),
       children: [],
     },
   ];
@@ -230,7 +247,7 @@ export const PREVIEW_SUBMISSIONS: Record<string, Submission | null> = {
     id: "sub-journal",
     assignment_id: "liq-journal",
     user_id: "preview-student",
-    status: "reviewed",
+    status: "approved",
     journal_text:
       "NQ, Tuesday London. Equal highs sat just above the Asia range so I waited for the sweep rather than chasing the break. Took the entry on the 1m displacement back inside, stop above the wick, first target at the opposing low.\n\nSized too small — I was still second-guessing the read, so a good call only paid a third of what it should have.",
     screenshot_paths: [],
@@ -276,6 +293,7 @@ export function previewRoster(): RosterRow[] {
     lessons_completed: [26, 19, 14, 11, 9, 4, 1][i],
     assignments_total: 8,
     assignments_submitted: [8, 6, 5, 3, 3, 1, 0][i],
+    awaiting_review: [0, 2, 1, 1, 0, 1, 0][i],
     last_active_at: new Date(Date.now() - days[i] * 86_400_000).toISOString(),
   }));
 }
@@ -294,6 +312,7 @@ export function previewStudent(id: string) {
   const submissions: StudentSubmissionRow[] = [
     {
       id: "sub-journal",
+      status: "approved",
       assignmentTitle: "Trade journal — one liquidity setup",
       kind: "journal",
       submittedAt: new Date(Date.now() - 3 * 86_400_000).toISOString(),
@@ -306,6 +325,7 @@ export function previewStudent(id: string) {
     },
     {
       id: "sub-quiz",
+      status: "submitted",
       assignmentTitle: "Liquidity concepts check",
       kind: "quiz",
       submittedAt: new Date(Date.now() - 4 * 86_400_000).toISOString(),
@@ -318,6 +338,7 @@ export function previewStudent(id: string) {
     },
     {
       id: "sub-check2",
+      status: "returned",
       assignmentTitle: "Re-watch before the next lecture",
       kind: "checkbox",
       submittedAt: new Date(Date.now() - 86_400_000).toISOString(),

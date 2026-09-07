@@ -2,9 +2,20 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import CourseView from "@/components/views/CourseView";
 import type { CourseLessonRow, CourseModuleRow } from "@/components/views/types";
-import type { Assignment, Lesson, LessonProgress } from "@/lib/types";
+import type { Lesson, LessonProgress } from "@/lib/types";
 
 const COURSE_SLUG = process.env.DEFAULT_COURSE_SLUG ?? "day-trading";
+
+type PathRow = {
+  lesson_id: string;
+  state: "done" | "current" | "locked";
+  homework_total: number;
+  homework_approved: number;
+  homework_pending: number;
+  homework_returned: number;
+  due_at: string | null;
+  overdue: boolean;
+};
 
 type RawModule = {
   id: string;
@@ -36,33 +47,22 @@ export default async function CoursePage({ searchParams }: PageProps<"/">) {
 
   if (!course) redirect("/pending?reason=no_course");
 
-  const [{ data: progressRows }, { data: assignmentRows }, { data: submissionRows }] =
-    await Promise.all([
-      supabase
-        .from("lesson_progress")
-        .select("lesson_id, last_position_seconds, percent_watched, completed_at")
-        .eq("user_id", user.id),
-      supabase.from("assignments").select("*").eq("course_id", course.id),
-      supabase.from("submissions").select("assignment_id, status"),
-    ]);
+  const [{ data: progressRows }, { data: pathRows }] = await Promise.all([
+    supabase
+      .from("lesson_progress")
+      .select("lesson_id, last_position_seconds, percent_watched, completed_at")
+      .eq("user_id", user.id),
+    // The gate is resolved in Postgres, not here — the same function the
+    // lesson page and the progress endpoint ask before letting anyone in.
+    supabase.rpc("course_path", { p_course_id: course.id }),
+  ]);
 
   const progress = new Map<string, LessonProgress>(
     (progressRows ?? []).map((p) => [p.lesson_id, p as LessonProgress]),
   );
 
-  const assignmentsByLesson = new Map<string, Assignment[]>();
-  for (const a of (assignmentRows ?? []) as Assignment[]) {
-    if (!a.lesson_id) continue;
-    assignmentsByLesson.set(a.lesson_id, [
-      ...(assignmentsByLesson.get(a.lesson_id) ?? []),
-      a,
-    ]);
-  }
-
-  const doneAssignments = new Set(
-    (submissionRows ?? [])
-      .filter((s) => s.status !== "draft")
-      .map((s) => s.assignment_id as string),
+  const gate = new Map<string, PathRow>(
+    ((pathRows ?? []) as PathRow[]).map((r) => [r.lesson_id, r]),
   );
 
   const raw = ((course.modules ?? []) as RawModule[]).sort(
@@ -86,7 +86,7 @@ export default async function CoursePage({ searchParams }: PageProps<"/">) {
   const ordinalOf = new Map(order.map((id, i) => [id, i + 1]));
 
   const toRow = (l: RawModule["lessons"][number]): CourseLessonRow => {
-    const hw = assignmentsByLesson.get(l.id) ?? [];
+    const g = gate.get(l.id);
     return {
       id: l.id,
       title: l.title,
@@ -96,8 +96,13 @@ export default async function CoursePage({ searchParams }: PageProps<"/">) {
       durationSeconds: l.duration_seconds,
       percent: Number(progress.get(l.id)?.percent_watched ?? 0),
       completed: Boolean(progress.get(l.id)?.completed_at),
-      homeworkTotal: hw.length,
-      homeworkDone: hw.filter((a) => doneAssignments.has(a.id)).length,
+      homeworkTotal: g?.homework_total ?? 0,
+      homeworkDone: g?.homework_approved ?? 0,
+      state: g?.state ?? "locked",
+      homeworkPending: g?.homework_pending ?? 0,
+      homeworkReturned: g?.homework_returned ?? 0,
+      dueAt: g?.due_at ?? null,
+      overdue: Boolean(g?.overdue),
     };
   };
 
@@ -129,8 +134,8 @@ export default async function CoursePage({ searchParams }: PageProps<"/">) {
       modules={modules}
       lecturesDone={allLessons.filter((l) => l.completed).length}
       lecturesTotal={allLessons.length}
-      homeworkDone={doneAssignments.size}
-      homeworkTotal={(assignmentRows ?? []).length}
+      homeworkDone={allLessons.reduce((n, l) => n + l.homeworkDone, 0)}
+      homeworkTotal={allLessons.reduce((n, l) => n + l.homeworkTotal, 0)}
     />
   );
 }

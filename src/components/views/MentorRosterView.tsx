@@ -34,6 +34,7 @@ export default function MentorRosterView({
   basePath = "",
 }: MentorRosterViewProps) {
   const stalledCount = students.filter((s) => isStalled(s.last_active_at)).length;
+  const queue = students.reduce((n, s) => n + s.awaiting_review, 0);
 
   return (
     <div>
@@ -48,6 +49,14 @@ export default function MentorRosterView({
             </span>
           </>
         )}
+        {queue > 0 && (
+          <>
+            {" · "}
+            <span className="text-accent">
+              {queue} waiting on you
+            </span>
+          </>
+        )}
       </p>
 
       <div className="mt-6 overflow-x-auto rounded-lg border border-border bg-surface">
@@ -57,6 +66,7 @@ export default function MentorRosterView({
               <th className="px-4 py-2.5 font-medium">Student</th>
               <th className="px-4 py-2.5 font-medium">Lectures</th>
               <th className="px-4 py-2.5 font-medium">Homework</th>
+              <th className="px-4 py-2.5 font-medium">To review</th>
               <th className="px-4 py-2.5 font-medium">Last active</th>
             </tr>
           </thead>
@@ -82,6 +92,15 @@ export default function MentorRosterView({
                       total={s.assignments_total}
                     />
                   </td>
+                  <td className="px-4 py-2.5">
+                    {s.awaiting_review > 0 ? (
+                      <span className="rounded-full bg-accent px-2 py-0.5 font-mono text-[11px] text-accent-ink">
+                        {s.awaiting_review}
+                      </span>
+                    ) : (
+                      <span className="font-mono text-xs text-muted-dim">—</span>
+                    )}
+                  </td>
                   <td className="px-4 py-2.5 font-mono text-xs">
                     <span className={stalled ? "text-danger" : "text-muted-dim"}>
                       {stalled && "! "}
@@ -93,7 +112,7 @@ export default function MentorRosterView({
             })}
             {students.length === 0 && (
               <tr>
-                <td colSpan={4} className="px-4 py-8 text-center text-muted">
+                <td colSpan={5} className="px-4 py-8 text-center text-muted">
                   Nobody has signed in yet.
                 </td>
               </tr>

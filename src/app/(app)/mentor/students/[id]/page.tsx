@@ -74,6 +74,7 @@ export default async function StudentDetailPage({
       const a = assignments.get(s.assignment_id);
       return {
         id: s.id,
+        status: s.status,
         assignmentTitle: a?.title ?? "Assignment",
         kind: a?.kind ?? "journal",
         submittedAt: s.submitted_at,

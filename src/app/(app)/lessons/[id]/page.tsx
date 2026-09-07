@@ -20,6 +20,11 @@ export default async function LessonPage({ params }: PageProps<"/lessons/[id]">)
 
   if (!lesson) notFound();
 
+  // The pathway gate. Same function the progress endpoint uses, so a student
+  // cannot reach a locked lecture by typing its URL either.
+  const { data: open } = await supabase.rpc("lesson_open", { p_lesson_id: id });
+  if (!open) redirect("/?locked=1");
+
   const [{ data: progress }, { data: assignmentRows }, { data: siblings }] =
     await Promise.all([
       supabase
@@ -86,6 +91,13 @@ export default async function LessonPage({ params }: PageProps<"/lessons/[id]">)
 
   const list = siblings ?? [];
   const idx = list.findIndex((l) => l.id === id);
+  const next = idx >= 0 && idx < list.length - 1 ? list[idx + 1] : null;
+
+  // Ask the same gate about the next lecture, so the link is honest rather
+  // than an invitation to a redirect.
+  const { data: nextOpen } = next
+    ? await supabase.rpc("lesson_open", { p_lesson_id: next.id })
+    : { data: true };
 
   return (
     <LessonView
@@ -105,7 +117,8 @@ export default async function LessonPage({ params }: PageProps<"/lessons/[id]">)
       screenshotUrls={screenshotUrls}
       userId={user.id}
       prev={idx > 0 ? list[idx - 1] : null}
-      next={idx >= 0 && idx < list.length - 1 ? list[idx + 1] : null}
+      next={next}
+      nextLocked={!nextOpen}
     />
   );
 }

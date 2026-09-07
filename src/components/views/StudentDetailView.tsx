@@ -68,8 +68,21 @@ export default function StudentDetailView({
             <div key={s.id} className="rounded-lg border border-border bg-surface p-4">
               <div className="flex items-center justify-between gap-3">
                 <h3 className="text-sm font-medium">{s.assignmentTitle}</h3>
-                <span className="font-mono text-[11px] text-muted-dim">
-                  {s.kind} · {new Date(s.submittedAt).toLocaleDateString()}
+                <span className="flex items-center gap-2 font-mono text-[11px] text-muted-dim">
+                  <span
+                    className={
+                      s.status === "approved"
+                        ? "text-progress"
+                        : s.status === "returned"
+                          ? "text-danger"
+                          : "text-accent"
+                    }
+                  >
+                    {s.status === "submitted" ? "awaiting review" : s.status}
+                  </span>
+                  <span>
+                    {s.kind} · {new Date(s.submittedAt).toLocaleDateString()}
+                  </span>
                 </span>
               </div>
 
@@ -112,6 +125,7 @@ export default function StudentDetailView({
               <FeedbackForm
                 submissionId={s.id}
                 initial={s.mentorFeedback}
+                status={s.status}
                 demo={demo}
               />
             </div>

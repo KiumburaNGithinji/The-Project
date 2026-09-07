@@ -59,9 +59,14 @@ export default function LessonPlayer({
   const bucketsRef = useRef<Set<number>>(new Set());
   const durationRef = useRef(0);
   const dirtyRef = useRef(false);
+  // Highest slice reached contiguously from the start. The student may play
+  // into the slice after it and no further, which is what "organically" means.
+  const frontierRef = useRef(-1);
+  const completeRef = useRef(initiallyComplete);
 
   const [percent, setPercent] = useState(initialPercent);
   const [complete, setComplete] = useState(initiallyComplete);
+  const [blocked, setBlocked] = useState(false);
 
   useEffect(() => {
     // Seed coverage so a returning student's bar doesn't reset to zero.
@@ -69,6 +74,12 @@ export default function LessonPlayer({
       const seed = Math.floor((initialPercent / 100) * (startAt / BUCKET_SECONDS));
       for (let i = 0; i < seed; i++) bucketsRef.current.add(i);
     }
+    // Resuming is not skipping: wherever they were allowed to get to last time
+    // is still allowed now.
+    frontierRef.current = Math.max(
+      frontierRef.current,
+      Math.floor(startAt / BUCKET_SECONDS) - 1,
+    );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -141,13 +152,29 @@ export default function LessonPlayer({
         durationRef.current = p.getDuration() || durationRef.current;
         if (!durationRef.current) return;
 
-        bucketsRef.current.add(Math.floor(p.getCurrentTime() / BUCKET_SECONDS));
+        const bucket = Math.floor(p.getCurrentTime() / BUCKET_SECONDS);
+
+        // Jumped past the frontier on a first watch — put them back. Once the
+        // lecture is complete the video behaves like any other.
+        if (!completeRef.current && bucket > frontierRef.current + 1) {
+          p.seekTo(Math.max(0, (frontierRef.current + 1) * BUCKET_SECONDS), true);
+          setBlocked(true);
+          return;
+        }
+
+        bucketsRef.current.add(bucket);
+        while (bucketsRef.current.has(frontierRef.current + 1)) {
+          frontierRef.current += 1;
+        }
         dirtyRef.current = true;
 
         const total = Math.max(1, Math.ceil(durationRef.current / BUCKET_SECONDS));
         const pct = Math.min(100, (bucketsRef.current.size / total) * 100);
         setPercent(pct);
-        if (pct >= COMPLETE_AT * 100) setComplete(true);
+        if (pct >= COMPLETE_AT * 100) {
+          completeRef.current = true;
+          setComplete(true);
+        }
       }, 1000);
 
       saver = setInterval(() => void save(), SAVE_EVERY_MS);
@@ -199,6 +226,13 @@ export default function LessonPlayer({
           {complete ? "✓ complete" : `${Math.floor(percent)}% watched`}
         </span>
       </div>
+
+      {blocked && !complete && (
+        <p className="mt-2 text-xs text-muted">
+          Skipping ahead is off until you have watched this lecture through
+          once. Rewinding is fine.
+        </p>
+      )}
     </div>
   );
 }
