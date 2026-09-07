@@ -4,7 +4,7 @@
 -- Quiz: read questions without the answer key
 -- ---------------------------------------------------------------------------
 create or replace function public.get_quiz(p_assignment_id uuid)
-returns table (id uuid, prompt text, options jsonb, position int)
+returns table (id uuid, prompt text, options jsonb, "position" int)
 language plpgsql
 stable
 security definer
