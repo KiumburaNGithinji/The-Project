@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { hasVideo, parseYouTubeId } from "@/lib/youtube";
+import { planMove, type SwapPlan } from "@/lib/reorder";
 
 type Result = { ok?: true; error?: string };
 
@@ -30,6 +31,29 @@ async function requireMentor() {
 function done(): Result {
   revalidatePath("/", "layout");
   return { ok: true };
+}
+
+type Client = NonNullable<Awaited<ReturnType<typeof requireMentor>>["supabase"]>;
+
+/** Write out a reorder plan. Usually two rows; a renumber only on repair. */
+async function applyPlan(
+  supabase: Client,
+  table: "lessons" | "modules",
+  plan: SwapPlan,
+): Promise<Result> {
+  if (plan.kind === "none") return { ok: true };
+
+  const rows =
+    plan.kind === "swap" ? [plan.a, plan.b] : plan.rows;
+
+  const results = await Promise.all(
+    rows.map((r) =>
+      supabase.from(table).update({ position: r.position }).eq("id", r.id),
+    ),
+  );
+
+  const err = results.find((r) => r.error)?.error;
+  return err ? { error: err.message } : done();
 }
 
 // ---------------------------------------------------------------------------
@@ -181,7 +205,7 @@ export async function deleteLesson(lessonId: string): Promise<Result> {
   return error ? { error: error.message } : done();
 }
 
-/** Swap positions with the neighbour above or below, within the module. */
+/** Move a lecture one slot within its section or topic. */
 export async function moveLesson(
   lessonId: string,
   direction: "up" | "down",
@@ -192,30 +216,24 @@ export async function moveLesson(
 
   const { data: self } = await supabase
     .from("lessons")
-    .select("id, module_id, position")
+    .select("module_id")
     .eq("id", lessonId)
     .maybeSingle();
 
   if (!self) return { error: "Lecture not found." };
 
-  const { data: neighbour } = await supabase
+  // Plan against the full sibling list, so the move always matches the order
+  // on screen even if positions have tied or left gaps.
+  const { data: siblings } = await supabase
     .from("lessons")
     .select("id, position")
-    .eq("module_id", self.module_id)
-    [direction === "up" ? "lt" : "gt"]("position", self.position)
-    .order("position", { ascending: direction !== "up" })
-    .limit(1)
-    .maybeSingle();
+    .eq("module_id", self.module_id);
 
-  if (!neighbour) return { ok: true }; // already at the end
-
-  const [a, b] = await Promise.all([
-    supabase.from("lessons").update({ position: neighbour.position }).eq("id", self.id),
-    supabase.from("lessons").update({ position: self.position }).eq("id", neighbour.id),
-  ]);
-
-  const err = a.error ?? b.error;
-  return err ? { error: err.message } : done();
+  return applyPlan(
+    supabase,
+    "lessons",
+    planMove(siblings ?? [], lessonId, direction),
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -264,7 +282,7 @@ export async function addModule(
   return error ? { error: error.message } : done();
 }
 
-/** Swap a section or topic with its neighbour at the same level. */
+/** Move a section or topic one slot among its same-level siblings. */
 export async function moveModule(
   moduleId: string,
   direction: "up" | "down",
@@ -275,7 +293,7 @@ export async function moveModule(
 
   const { data: self } = await supabase
     .from("modules")
-    .select("id, course_id, parent_id, position")
+    .select("course_id, parent_id")
     .eq("id", moduleId)
     .maybeSingle();
 
@@ -286,24 +304,15 @@ export async function moveModule(
     .select("id, position")
     .eq("course_id", self.course_id);
 
-  const { data: neighbour } = await (self.parent_id
+  const { data: siblings } = await (self.parent_id
     ? base.eq("parent_id", self.parent_id)
-    : base.is("parent_id", null)
-  )
-    [direction === "up" ? "lt" : "gt"]("position", self.position)
-    .order("position", { ascending: direction !== "up" })
-    .limit(1)
-    .maybeSingle();
+    : base.is("parent_id", null));
 
-  if (!neighbour) return { ok: true };
-
-  const [a, b] = await Promise.all([
-    supabase.from("modules").update({ position: neighbour.position }).eq("id", self.id),
-    supabase.from("modules").update({ position: self.position }).eq("id", neighbour.id),
-  ]);
-
-  const err = a.error ?? b.error;
-  return err ? { error: err.message } : done();
+  return applyPlan(
+    supabase,
+    "modules",
+    planMove(siblings ?? [], moduleId, direction),
+  );
 }
 
 export async function renameModule(

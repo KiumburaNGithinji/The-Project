@@ -34,6 +34,8 @@ export default function ModuleBlock({
   isLast,
   depth = 0,
   demo = false,
+  onDemoMoveLesson,
+  onDemoMoveModule,
 }: {
   module: ManageModule;
   courseId: string;
@@ -43,6 +45,8 @@ export default function ModuleBlock({
   isLast: boolean;
   depth?: number;
   demo?: boolean;
+  onDemoMoveLesson?: (id: string, direction: "up" | "down") => void;
+  onDemoMoveModule?: (id: string, direction: "up" | "down") => void;
 }) {
   const [title, setTitle] = useState(module.title);
   const [newLesson, setNewLesson] = useState("");
@@ -105,7 +109,11 @@ export default function ModuleBlock({
           type="button"
           aria-label="Move up"
           disabled={isFirst || pending}
-          onClick={() => run(() => moveModule(module.id, "up"), "Moved.")}
+          onClick={() =>
+            demo && onDemoMoveModule
+              ? onDemoMoveModule(module.id, "up")
+              : run(() => moveModule(module.id, "up"), "Moved.")
+          }
           className={iconBtn}
         >
           ↑
@@ -114,7 +122,11 @@ export default function ModuleBlock({
           type="button"
           aria-label="Move down"
           disabled={isLast || pending}
-          onClick={() => run(() => moveModule(module.id, "down"), "Moved.")}
+          onClick={() =>
+            demo && onDemoMoveModule
+              ? onDemoMoveModule(module.id, "down")
+              : run(() => moveModule(module.id, "down"), "Moved.")
+          }
           className={iconBtn}
         >
           ↓
@@ -154,6 +166,7 @@ export default function ModuleBlock({
               moduleId={module.id}
               moveTargets={moveTargets}
               demo={demo}
+              onDemoMove={onDemoMoveLesson}
             />
           ))}
         </ul>
@@ -178,6 +191,8 @@ export default function ModuleBlock({
               isLast={i === module.children.length - 1}
               depth={depth + 1}
               demo={demo}
+              onDemoMoveLesson={onDemoMoveLesson}
+              onDemoMoveModule={onDemoMoveModule}
             />
           ))}
         </div>

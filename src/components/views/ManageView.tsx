@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import ModuleBlock from "@/components/manage/ModuleBlock";
 import { addModule, publishAllLinked } from "@/app/(app)/manage/actions";
+import { shiftById } from "@/lib/reorder";
 import { hasVideo } from "@/lib/youtube";
 import type { ManageViewProps } from "./types";
 
@@ -13,16 +14,48 @@ export default function ManageView({
   moveTargets,
   demo = false,
 }: ManageViewProps) {
+  // In preview there is no database, so reordering is applied to a local copy
+  // of the tree — otherwise the arrows would look broken.
+  const [tree, setTree] = useState(modules);
+  const list = demo ? tree : modules;
+
   const [newModule, setNewModule] = useState("");
   const [msg, setMsg] = useState<string | null>(null);
   const [pending, start] = useTransition();
 
-  const flatten = (list: typeof modules): typeof modules =>
-    list.flatMap((m) => [m, ...flatten(m.children)]);
-  const all = flatten(modules).flatMap((m) => m.lessons);
+  const flatten = (xs: typeof modules): typeof modules =>
+    xs.flatMap((m) => [m, ...flatten(m.children)]);
+  const all = flatten(list).flatMap((m) => m.lessons);
   const readyToPublish = all.filter(
     (l) => hasVideo(l.youtubeId) && !l.isPublished,
   ).length;
+
+  function demoMoveLesson(lessonId: string, direction: "up" | "down") {
+    setTree((prev) =>
+      prev.map((section) => {
+        const own = shiftById(section.lessons, lessonId, direction);
+        if (own) return { ...section, lessons: own };
+        return {
+          ...section,
+          children: section.children.map((topic) => {
+            const moved = shiftById(topic.lessons, lessonId, direction);
+            return moved ? { ...topic, lessons: moved } : topic;
+          }),
+        };
+      }),
+    );
+  }
+
+  function demoMoveModule(moduleId: string, direction: "up" | "down") {
+    setTree((prev) => {
+      const top = shiftById(prev, moduleId, direction);
+      if (top) return top;
+      return prev.map((section) => {
+        const moved = shiftById(section.children, moduleId, direction);
+        return moved ? { ...section, children: moved } : section;
+      });
+    });
+  }
 
   function publishAll() {
     if (demo) {
@@ -112,15 +145,17 @@ export default function ManageView({
       <p className="sr-only">{courseTitle}</p>
 
       <div className="mt-6 space-y-5">
-        {modules.map((m, i) => (
+        {list.map((m, i) => (
           <ModuleBlock
             key={m.id}
             module={m}
             courseId={courseId}
             moveTargets={moveTargets}
             isFirst={i === 0}
-            isLast={i === modules.length - 1}
-            ordinalBase={modules
+            isLast={i === list.length - 1}
+            onDemoMoveLesson={demoMoveLesson}
+            onDemoMoveModule={demoMoveModule}
+            ordinalBase={list
               .slice(0, i)
               .reduce(
                 (n, prev) =>

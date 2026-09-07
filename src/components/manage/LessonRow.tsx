@@ -27,6 +27,7 @@ export default function LessonRow({
   moduleId,
   moveTargets,
   demo = false,
+  onDemoMove,
 }: {
   lesson: ManageLesson;
   ordinal: number;
@@ -35,6 +36,7 @@ export default function LessonRow({
   moduleId: string;
   moveTargets: MoveTarget[];
   demo?: boolean;
+  onDemoMove?: (id: string, direction: "up" | "down") => void;
 }) {
   const linked = hasVideo(lesson.youtubeId);
 
@@ -181,7 +183,11 @@ export default function LessonRow({
             type="button"
             aria-label="Move up"
             disabled={isFirst || pending}
-            onClick={() => run(() => moveLesson(lesson.id, "up"), "Moved.")}
+            onClick={() =>
+              demo && onDemoMove
+                ? onDemoMove(lesson.id, "up")
+                : run(() => moveLesson(lesson.id, "up"), "Moved.")
+            }
             className={iconBtn}
           >
             ↑
@@ -190,7 +196,11 @@ export default function LessonRow({
             type="button"
             aria-label="Move down"
             disabled={isLast || pending}
-            onClick={() => run(() => moveLesson(lesson.id, "down"), "Moved.")}
+            onClick={() =>
+              demo && onDemoMove
+                ? onDemoMove(lesson.id, "down")
+                : run(() => moveLesson(lesson.id, "down"), "Moved.")
+            }
             className={iconBtn}
           >
             ↓
