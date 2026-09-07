@@ -7,12 +7,14 @@ import { createClient } from "@/lib/supabase/client";
 const ERRORS: Record<string, string> = {
   missing_code: "Discord did not send us back a login code. Try again.",
   exchange_failed: "We could not complete that sign-in. Try again.",
+  provider_error: "Discord turned that sign-in down.",
 };
 
 function LoginForm() {
   const params = useSearchParams();
   const [busy, setBusy] = useState(false);
   const error = params.get("error");
+  const detail = params.get("detail");
   const next = params.get("next") ?? "/";
 
   async function signIn() {
@@ -39,6 +41,9 @@ function LoginForm() {
         {error && (
           <p className="mt-6 rounded-md border-l-2 border-danger bg-danger/10 px-3 py-2 text-sm">
             {ERRORS[error] ?? "Something went wrong signing you in."}
+            {detail && (
+              <span className="mt-1 block text-xs text-muted">{detail}</span>
+            )}
           </p>
         )}
 

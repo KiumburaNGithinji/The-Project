@@ -24,6 +24,18 @@ export async function GET(request: NextRequest) {
   const code = searchParams.get("code");
   const next = searchParams.get("next") ?? "/";
 
+  // Supabase redirects here with ?error=... when the provider exchange fails —
+  // a bad client secret, an unverified Discord email, a rejected redirect.
+  // Pass the reason through; guessing from "no code" wastes an afternoon.
+  const providerError =
+    searchParams.get("error_description") ?? searchParams.get("error");
+  if (providerError) {
+    const detail = encodeURIComponent(providerError.slice(0, 300));
+    return NextResponse.redirect(
+      `${origin}/login?error=provider_error&detail=${detail}`,
+    );
+  }
+
   if (!code) {
     return NextResponse.redirect(`${origin}/login?error=missing_code`);
   }
@@ -32,7 +44,10 @@ export async function GET(request: NextRequest) {
   const { data, error } = await supabase.auth.exchangeCodeForSession(code);
 
   if (error || !data.session) {
-    return NextResponse.redirect(`${origin}/login?error=exchange_failed`);
+    const detail = encodeURIComponent((error?.message ?? "no session").slice(0, 300));
+    return NextResponse.redirect(
+      `${origin}/login?error=exchange_failed&detail=${detail}`,
+    );
   }
 
   const userId = data.session.user.id;
