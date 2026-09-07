@@ -4,6 +4,9 @@ Course platform for a day-trading mentorship. Replaces "unlisted YouTube links
 dropped in Discord" with lectures the mentor can actually track: who watched
 what, how far they got, and whether the homework came in.
 
+**Setup lives in [SETUP.md](SETUP.md).** Nothing has been run against a real
+Supabase project yet.
+
 ## Stack
 
 - **Next.js 16** (App Router) + React 19 + Tailwind 4
@@ -11,16 +14,33 @@ what, how far they got, and whether the homework came in.
 - Lectures stay on **unlisted YouTube**; the site embeds them and tracks watch
   coverage through the YouTube iframe API
 
+## Try it without a database
+
+```bash
+pnpm install && pnpm dev
+```
+
+Then open <http://localhost:3000/preview> — a fixture-backed walkthrough of
+every screen. No Supabase, no login, nothing saved.
+
+`/preview`, `/preview/lessons/liquidity`, `/preview/mentor`, `/preview/manage`.
+
 ## How the pieces fit
 
 **Access.** Students sign in with Discord. If `DISCORD_GUILD_ID` is set, the
 callback checks the student is a member of the mentor's server before enrolling
 them; if they aren't, they land on `/pending`. Everyone starts as a `student`.
 
+**Structure.** Course → sections → topics → lectures. `modules` nests one level
+via a nullable `parent_id`, so "Manipulation" can hold "Pt 1" and "Pt 2" while
+still sitting under "The Project". Child modules keep their `course_id`, which
+is why every RLS policy and the rollup view work unchanged across the nesting.
+
 **Watch tracking.** The player records which 5-second slices of a lecture were
 actually played, not elapsed time, so scrubbing to the end doesn't mark a
 lecture complete. A lesson flips to complete at 90% coverage. Progress saves
-every 15s, on pause, and on tab hide.
+every 15s, on pause, and on tab hide. Lecture runtime is measured on first watch
+and backfilled, so nobody types durations.
 
 **Homework.** Four kinds, one row per student per assignment:
 
@@ -39,53 +59,43 @@ select policy; students read questions through `get_quiz()` and are graded by
 progress and flags anyone inactive 7+ days. `/mentor/students/[id]` shows their
 per-lecture progress and every submission, with a feedback box.
 
-## Setup
+**Editing.** `/manage` is the mentor's console: paste a YouTube link per lecture
+(any URL form), upload a custom thumbnail, rename, reorder, move between topics,
+publish/unpublish, add and delete lectures, topics and sections. No SQL.
 
-1. Create a Supabase project.
+## Layout
 
-2. Run the migrations in order (Supabase SQL editor, or `supabase db push`):
+```
+src/
+  app/
+    (app)/          signed-in pages: course, lesson, mentor, manage
+    preview/        fixture-backed copies of the same screens
+    auth/callback/  Discord OAuth exchange + guild gate + enrolment
+    api/progress/   watch-progress writes, duration backfill
+  components/
+    views/          presentational screens, shared by (app) and preview
+    manage/         mentor editor rows
+  lib/
+    supabase/       browser, server, admin, and proxy clients
+supabase/
+  migrations/       four files, run in filename order
+  seed.sql          course, sections, 28 lecture titles (re-runnable)
+```
 
-   ```
-   supabase/migrations/20260907000000_init.sql
-   supabase/migrations/20260907000100_rls.sql
-   supabase/migrations/20260907000200_quiz_and_storage.sql
-   ```
-
-3. Seed a course: run `supabase/seed.sql`, then replace the `REPLACE_ME`
-   `youtube_id` with a real video ID.
-
-4. **Discord OAuth.** Create an app at
-   <https://discord.com/developers/applications>, add the redirect URL Supabase
-   gives you under Authentication → Providers → Discord, and paste the client ID
-   and secret into Supabase. The app requests `identify email guilds`.
-
-5. Copy `.env.example` to `.env.local` and fill it in.
-
-6. Install and run:
-
-   ```bash
-   pnpm install
-   pnpm dev
-   ```
-
-7. **Promote the mentor.** Sign in once with his Discord account, then in the
-   SQL editor:
-
-   ```sql
-   update public.profiles set role = 'mentor' where discord_id = 'HIS_DISCORD_ID';
-   ```
-
-## Adding lectures
-
-There's no admin UI yet — content goes in through SQL. A lecture needs a
-`module_id`, a `title`, and the `youtube_id` (the part after `?v=`). Set
-`duration_seconds` if you want the runtime shown on the course page.
+The `views/` split is deliberate: the real pages fetch from Supabase and the
+preview pages hand in fixtures, but both render one copy of the markup, so the
+preview can't drift from the real thing.
 
 ## Known gaps
 
-- No admin UI for creating modules, lectures, or assignments — SQL only.
+- **Nothing has run against a real database.** The SQL is statically checked
+  only.
+- Assignments and quiz questions are still SQL-only; the editor covers lectures,
+  topics and sections.
 - Unlisted YouTube URLs are still shareable outside the site. Playback is
   isolated in `LessonPlayer`, so swapping to signed-URL hosting (Cloudflare
-  Stream, Mux) is a contained change if that becomes a problem.
-- No email or Discord notifications when homework is submitted or reviewed.
+  Stream, Mux) is a contained change.
+- No notifications when homework is submitted or reviewed.
 - No payments.
+- The Advanced section only has the two lectures visible in the Discord
+  screenshot; the list was cut off.

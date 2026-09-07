@@ -3,6 +3,7 @@ import { createServerClient } from "@supabase/ssr";
 
 const PUBLIC_PATHS = ["/login", "/auth", "/pending", "/preview"];
 
+/** Refreshes the Supabase session on every request and gates private routes. */
 export async function updateSession(request: NextRequest) {
   let response = NextResponse.next({ request });
 

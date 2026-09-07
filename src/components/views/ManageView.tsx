@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import ModuleBlock from "@/components/manage/ModuleBlock";
-import { addModule } from "@/app/(app)/manage/actions";
+import { addModule, publishAllLinked } from "@/app/(app)/manage/actions";
 import { hasVideo } from "@/lib/youtube";
 import type { ManageViewProps } from "./types";
 
@@ -20,6 +20,20 @@ export default function ManageView({
   const flatten = (list: typeof modules): typeof modules =>
     list.flatMap((m) => [m, ...flatten(m.children)]);
   const all = flatten(modules).flatMap((m) => m.lessons);
+  const readyToPublish = all.filter(
+    (l) => hasVideo(l.youtubeId) && !l.isPublished,
+  ).length;
+
+  function publishAll() {
+    if (demo) {
+      setMsg(`${readyToPublish} lectures published. (preview — nothing saved)`);
+      return;
+    }
+    start(async () => {
+      const r = await publishAllLinked(courseId);
+      setMsg(r.error ?? "Published everything that has a link.");
+    });
+  }
   const linked = all.filter((l) => hasVideo(l.youtubeId)).length;
   const live = all.filter((l) => l.isPublished).length;
 
@@ -76,6 +90,23 @@ export default function ManageView({
           need a link. Runtime fills in automatically the first time someone
           watches — you don&apos;t need to enter it.
         </p>
+      )}
+
+      {readyToPublish > 0 && (
+        <div className="mt-3 flex flex-wrap items-center gap-3 rounded-md border border-border bg-surface px-3 py-2">
+          <span className="text-sm">
+            {readyToPublish} linked lecture{readyToPublish === 1 ? " is" : "s are"}{" "}
+            still hidden from students.
+          </span>
+          <button
+            type="button"
+            disabled={pending}
+            onClick={publishAll}
+            className="rounded-md bg-accent px-3 py-1 text-xs font-medium text-accent-ink transition hover:bg-accent-hover disabled:opacity-40"
+          >
+            {pending ? "Publishing…" : "Publish all linked"}
+          </button>
+        </div>
       )}
 
       <p className="sr-only">{courseTitle}</p>

@@ -122,6 +122,7 @@ insert into storage.buckets (id, name, public)
 values ('submissions', 'submissions', false)
 on conflict (id) do nothing;
 
+drop policy if exists "students upload own screenshots" on storage.objects;
 create policy "students upload own screenshots" on storage.objects
   for insert to authenticated
   with check (
@@ -129,6 +130,7 @@ create policy "students upload own screenshots" on storage.objects
     and (storage.foldername(name))[1] = auth.uid()::text
   );
 
+drop policy if exists "students read own screenshots" on storage.objects;
 create policy "students read own screenshots" on storage.objects
   for select to authenticated
   using (
@@ -136,6 +138,7 @@ create policy "students read own screenshots" on storage.objects
     and ((storage.foldername(name))[1] = auth.uid()::text or public.is_mentor())
   );
 
+drop policy if exists "students delete own screenshots" on storage.objects;
 create policy "students delete own screenshots" on storage.objects
   for delete to authenticated
   using (

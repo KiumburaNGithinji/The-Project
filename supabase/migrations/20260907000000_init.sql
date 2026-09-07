@@ -7,7 +7,7 @@ create extension if not exists "pgcrypto";
 -- ---------------------------------------------------------------------------
 -- Profiles
 -- ---------------------------------------------------------------------------
-create table public.profiles (
+create table if not exists public.profiles (
   id          uuid primary key references auth.users(id) on delete cascade,
   discord_id  text unique,
   username    text,
@@ -40,6 +40,7 @@ begin
 end;
 $$;
 
+drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created
   after insert on auth.users
   for each row execute function public.handle_new_user();
@@ -62,7 +63,7 @@ $$;
 -- ---------------------------------------------------------------------------
 -- Course structure
 -- ---------------------------------------------------------------------------
-create table public.courses (
+create table if not exists public.courses (
   id           uuid primary key default gen_random_uuid(),
   slug         text not null unique,
   title        text not null,
@@ -71,7 +72,7 @@ create table public.courses (
   created_at   timestamptz not null default now()
 );
 
-create table public.modules (
+create table if not exists public.modules (
   id          uuid primary key default gen_random_uuid(),
   course_id   uuid not null references public.courses(id) on delete cascade,
   title       text not null,
@@ -79,9 +80,9 @@ create table public.modules (
   position    int not null default 0,
   created_at  timestamptz not null default now()
 );
-create index modules_course_idx on public.modules(course_id, position);
+create index if not exists modules_course_idx on public.modules(course_id, position);
 
-create table public.lessons (
+create table if not exists public.lessons (
   id               uuid primary key default gen_random_uuid(),
   module_id        uuid not null references public.modules(id) on delete cascade,
   title            text not null,
@@ -92,9 +93,9 @@ create table public.lessons (
   is_published     boolean not null default true,
   created_at       timestamptz not null default now()
 );
-create index lessons_module_idx on public.lessons(module_id, position);
+create index if not exists lessons_module_idx on public.lessons(module_id, position);
 
-create table public.enrollments (
+create table if not exists public.enrollments (
   id          uuid primary key default gen_random_uuid(),
   user_id     uuid not null references public.profiles(id) on delete cascade,
   course_id   uuid not null references public.courses(id) on delete cascade,
@@ -121,7 +122,7 @@ $$;
 -- ---------------------------------------------------------------------------
 -- Watch progress
 -- ---------------------------------------------------------------------------
-create table public.lesson_progress (
+create table if not exists public.lesson_progress (
   id                    uuid primary key default gen_random_uuid(),
   user_id               uuid not null references public.profiles(id) on delete cascade,
   lesson_id             uuid not null references public.lessons(id) on delete cascade,
@@ -132,12 +133,12 @@ create table public.lesson_progress (
   updated_at            timestamptz not null default now(),
   unique (user_id, lesson_id)
 );
-create index lesson_progress_user_idx on public.lesson_progress(user_id);
+create index if not exists lesson_progress_user_idx on public.lesson_progress(user_id);
 
 -- ---------------------------------------------------------------------------
 -- Homework
 -- ---------------------------------------------------------------------------
-create table public.assignments (
+create table if not exists public.assignments (
   id           uuid primary key default gen_random_uuid(),
   course_id    uuid not null references public.courses(id) on delete cascade,
   lesson_id    uuid references public.lessons(id) on delete cascade,
@@ -149,12 +150,12 @@ create table public.assignments (
   pass_score   numeric(5,2),           -- quiz only: percent needed to count as complete
   created_at   timestamptz not null default now()
 );
-create index assignments_course_idx on public.assignments(course_id, position);
-create index assignments_lesson_idx on public.assignments(lesson_id);
+create index if not exists assignments_course_idx on public.assignments(course_id, position);
+create index if not exists assignments_lesson_idx on public.assignments(lesson_id);
 
 -- correct_index must never reach the browser. No student-facing select policy
 -- exists on this table; students read questions through get_quiz() instead.
-create table public.quiz_questions (
+create table if not exists public.quiz_questions (
   id            uuid primary key default gen_random_uuid(),
   assignment_id uuid not null references public.assignments(id) on delete cascade,
   prompt        text not null,
@@ -163,9 +164,9 @@ create table public.quiz_questions (
   explanation   text,
   position      int not null default 0
 );
-create index quiz_questions_assignment_idx on public.quiz_questions(assignment_id, position);
+create index if not exists quiz_questions_assignment_idx on public.quiz_questions(assignment_id, position);
 
-create table public.submissions (
+create table if not exists public.submissions (
   id               uuid primary key default gen_random_uuid(),
   assignment_id    uuid not null references public.assignments(id) on delete cascade,
   user_id          uuid not null references public.profiles(id) on delete cascade,
@@ -181,5 +182,5 @@ create table public.submissions (
   reviewed_at      timestamptz,
   unique (assignment_id, user_id)
 );
-create index submissions_user_idx on public.submissions(user_id);
-create index submissions_assignment_idx on public.submissions(assignment_id);
+create index if not exists submissions_user_idx on public.submissions(user_id);
+create index if not exists submissions_assignment_idx on public.submissions(assignment_id);

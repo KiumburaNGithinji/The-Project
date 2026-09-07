@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { parseYouTubeId } from "@/lib/youtube";
+import { hasVideo, parseYouTubeId } from "@/lib/youtube";
 
 type Result = { ok?: true; error?: string };
 
@@ -84,10 +84,60 @@ export async function setLessonPublished(
   const gate = await requireMentor();
   if (gate.error) return { error: gate.error };
 
+  // Going live without a video would show students a lecture they cannot
+  // watch, so the link has to come first.
+  if (isPublished) {
+    const { data: lesson } = await gate.supabase!
+      .from("lessons")
+      .select("youtube_id")
+      .eq("id", lessonId)
+      .maybeSingle();
+
+    if (!hasVideo(lesson?.youtube_id)) {
+      return { error: "Add the YouTube link before going live." };
+    }
+  }
+
   const { error } = await gate.supabase!
     .from("lessons")
     .update({ is_published: isPublished })
     .eq("id", lessonId);
+
+  return error ? { error: error.message } : done();
+}
+
+/** Flip every linked-but-hidden lecture live in one go. */
+export async function publishAllLinked(courseId: string): Promise<Result> {
+  const gate = await requireMentor();
+  if (gate.error) return { error: gate.error };
+  const supabase = gate.supabase!;
+
+  const { data: modules } = await supabase
+    .from("modules")
+    .select("id")
+    .eq("course_id", courseId);
+
+  const moduleIds = (modules ?? []).map((m) => m.id as string);
+  if (moduleIds.length === 0) return { ok: true };
+
+  const { data: candidates } = await supabase
+    .from("lessons")
+    .select("id, youtube_id")
+    .in("module_id", moduleIds)
+    .eq("is_published", false);
+
+  const ids = (candidates ?? [])
+    .filter((l) => hasVideo(l.youtube_id as string))
+    .map((l) => l.id as string);
+
+  if (ids.length === 0) {
+    return { error: "Nothing to publish — link some lectures first." };
+  }
+
+  const { error } = await supabase
+    .from("lessons")
+    .update({ is_published: true })
+    .in("id", ids);
 
   return error ? { error: error.message } : done();
 }
