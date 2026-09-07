@@ -44,3 +44,6 @@ next-env.d.ts
 
 # Screenshots dropped into the project folder
 Screenshot*.png
+
+# Local Netlify folder
+.netlify
