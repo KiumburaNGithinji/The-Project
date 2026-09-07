@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Suspense, type ReactNode } from "react";
 import SearchBar from "@/components/SearchBar";
 import ProfileMenu from "@/components/ProfileMenu";
+import Mark from "@/components/Mark";
 import { ROLE_LABELS } from "@/lib/roles";
 import type { Role } from "@/lib/types";
 
@@ -54,9 +55,7 @@ export default function AppShell({
             href={home}
             className="flex shrink-0 items-center gap-2 text-base font-semibold tracking-tight"
           >
-            <span className="grid h-7 w-7 place-items-center rounded-md bg-accent font-mono text-xs text-accent-ink">
-              TP
-            </span>
+            <Mark className="h-7 w-7 shrink-0" />
             <span className="hidden sm:inline">The Project</span>
           </Link>
 
