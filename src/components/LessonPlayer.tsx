@@ -93,6 +93,9 @@ export default function LessonPlayer({
         watchedSeconds: bucketsRef.current.size * BUCKET_SECONDS,
         percentWatched: Number(pct.toFixed(2)),
         completed: done,
+        // Lets the server fill in a lecture's runtime without the mentor
+        // ever typing one.
+        durationSeconds: Math.round(durationRef.current),
       });
 
       if (final && navigator.sendBeacon) {

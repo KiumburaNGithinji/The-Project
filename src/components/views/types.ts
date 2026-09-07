@@ -101,3 +101,24 @@ export type StudentDetailViewProps = {
   lectures: StudentLectureRow[];
   submissions: StudentSubmissionRow[];
 };
+
+export type ManageLesson = {
+  id: string;
+  title: string;
+  youtubeId: string;
+  isPublished: boolean;
+  durationSeconds: number | null;
+};
+
+export type ManageModule = {
+  id: string;
+  title: string;
+  lessons: ManageLesson[];
+};
+
+export type ManageViewProps = {
+  courseId: string;
+  courseTitle: string;
+  modules: ManageModule[];
+  demo?: boolean;
+};

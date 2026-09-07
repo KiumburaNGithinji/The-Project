@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 export async function POST(request: NextRequest) {
   const supabase = await createClient();
@@ -17,6 +18,7 @@ export async function POST(request: NextRequest) {
     watchedSeconds?: number;
     percentWatched?: number;
     completed?: boolean;
+    durationSeconds?: number;
   };
 
   try {
@@ -57,6 +59,19 @@ export async function POST(request: NextRequest) {
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 400 });
+  }
+
+  // Record the lecture's runtime the first time anyone watches it. Students
+  // cannot write to `lessons` under RLS, so this one field goes through the
+  // service role — and only when the column is still empty.
+  const duration = Math.round(body.durationSeconds ?? 0);
+  if (duration > 0) {
+    const admin = createAdminClient();
+    await admin
+      .from("lessons")
+      .update({ duration_seconds: duration })
+      .eq("id", lessonId)
+      .is("duration_seconds", null);
   }
 
   return NextResponse.json({ ok: true });

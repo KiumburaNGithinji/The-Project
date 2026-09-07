@@ -67,9 +67,14 @@ export default function AppShell({
               <span aria-hidden="true">▦</span> Course
             </Link>
             {isMentor && (
-              <Link href={`${basePath}/mentor`} className={navLink}>
-                <span aria-hidden="true">◫</span> Students
-              </Link>
+              <>
+                <Link href={`${basePath}/mentor`} className={navLink}>
+                  <span aria-hidden="true">◫</span> Students
+                </Link>
+                <Link href={`${basePath}/manage`} className={navLink}>
+                  <span aria-hidden="true">✎</span> Manage content
+                </Link>
+              </>
             )}
           </nav>
 
