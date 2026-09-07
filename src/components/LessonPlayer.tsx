@@ -5,6 +5,8 @@ import { useEffect, useRef, useState } from "react";
 const BUCKET_SECONDS = 5;
 const COMPLETE_AT = 0.9; // 90% of the lecture actually seen
 const SAVE_EVERY_MS = 15_000;
+/** Sentinel used by /preview so no real video is embedded. */
+const PREVIEW_ID = "PREVIEW";
 
 type Props = {
   lessonId: string;
@@ -12,6 +14,8 @@ type Props = {
   startAt: number;
   initialPercent: number;
   initiallyComplete: boolean;
+  /** Fixture walkthrough: track locally, never POST progress. */
+  demo?: boolean;
 };
 
 declare global {
@@ -46,6 +50,7 @@ export default function LessonPlayer({
   startAt,
   initialPercent,
   initiallyComplete,
+  demo = false,
 }: Props) {
   const hostRef = useRef<HTMLDivElement>(null);
   const playerRef = useRef<YT.Player | null>(null);
@@ -73,6 +78,7 @@ export default function LessonPlayer({
     let saver: ReturnType<typeof setInterval> | undefined;
 
     const save = async (final = false) => {
+      if (demo) return;
       if (!dirtyRef.current || !durationRef.current) return;
       dirtyRef.current = false;
 
@@ -100,6 +106,8 @@ export default function LessonPlayer({
         keepalive: true,
       }).catch(() => {});
     };
+
+    if (youtubeId === PREVIEW_ID) return;
 
     loadIframeApi().then(() => {
       if (cancelled || !hostRef.current) return;
@@ -156,12 +164,25 @@ export default function LessonPlayer({
       playerRef.current?.destroy?.();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lessonId, youtubeId]);
+  }, [lessonId, youtubeId, demo]);
 
   return (
     <div>
       <div className="aspect-video w-full overflow-hidden rounded-lg border border-border bg-black">
-        <div ref={hostRef} className="h-full w-full" />
+        {youtubeId === PREVIEW_ID ? (
+          <div className="grid h-full w-full place-items-center border-0 bg-surface">
+            <div className="text-center">
+              <div className="font-mono text-xs uppercase tracking-[0.2em] text-muted-dim">
+                video
+              </div>
+              <p className="mt-2 max-w-xs text-xs text-muted-dim">
+                The unlisted YouTube player renders here.
+              </p>
+            </div>
+          </div>
+        ) : (
+          <div ref={hostRef} className="h-full w-full" />
+        )}
       </div>
 
       <div className="mt-3 flex items-center gap-3">
@@ -171,8 +192,8 @@ export default function LessonPlayer({
             style={{ width: `${Math.min(100, percent)}%` }}
           />
         </div>
-        <span className="w-28 shrink-0 text-right font-mono text-xs text-muted">
-          {complete ? "complete" : `${Math.floor(percent)}% watched`}
+        <span className="w-32 shrink-0 text-right font-mono text-xs text-muted-dim">
+          {complete ? "✓ complete" : `${Math.floor(percent)}% watched`}
         </span>
       </div>
     </div>

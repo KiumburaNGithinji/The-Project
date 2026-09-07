@@ -26,7 +26,7 @@ export default async function PendingPage({
         <p className="mt-3 text-sm text-muted">{copy.body}</p>
         <a
           href="/login"
-          className="mt-6 inline-block rounded-md border border-border px-4 py-2 text-sm hover:bg-surface"
+          className="mt-6 inline-block rounded-md border border-border-strong px-4 py-2 text-sm transition hover:bg-surface-2"
         >
           Back to sign in
         </a>

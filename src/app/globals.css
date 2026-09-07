@@ -1,17 +1,28 @@
 @import "tailwindcss";
 
-/* Committed dark palette — a trading desk at 6am, not a SaaS dashboard. */
+/* Palette lifted from the mentor's TradingView setup: near-black with a blue
+   cast rather than flat #000, monochrome surfaces, one blue accent, red kept
+   for genuine negatives only.
+
+   Text contrast is deliberately high — the dimmest text tone still clears
+   ~5.5:1 on the base background, so nothing on the page is a squint. */
 :root {
-  --background: #0b0e13;
-  --surface: #131822;
-  --surface-2: #1b2230;
-  --border: #262f3f;
-  --foreground: #e6ebf2;
-  --muted: #8b97a8;
-  --accent: #4ade80;
-  --accent-dim: #16311f;
-  --danger: #f87171;
-  --warn: #fbbf24;
+  --background: #0a0c12;      /* chart pane */
+  --surface: #10131c;         /* panels */
+  --surface-2: #171b26;       /* raised rows, session bands */
+  --border: #252a38;
+  --border-strong: #3a4152;
+
+  --foreground: #edf0f7;      /* ~17:1 — candle white */
+  --muted: #a3acbf;           /* ~9:1  */
+  --muted-dim: #7c8496;       /* ~5.5:1 — the floor, small labels only */
+
+  --accent: #2962ff;          /* the blue on the BUY tag and crosshair */
+  --accent-hover: #1e53e0;
+  --accent-ink: #ffffff;      /* text on accent fills */
+  --accent-soft: #14203f;     /* blue at low alpha over the base */
+
+  --danger: #f23645;          /* the red on the SELL tag */
 }
 
 @theme inline {
@@ -19,12 +30,15 @@
   --color-surface: var(--surface);
   --color-surface-2: var(--surface-2);
   --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
   --color-foreground: var(--foreground);
   --color-muted: var(--muted);
+  --color-muted-dim: var(--muted-dim);
   --color-accent: var(--accent);
-  --color-accent-dim: var(--accent-dim);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-ink: var(--accent-ink);
+  --color-accent-soft: var(--accent-soft);
   --color-danger: var(--danger);
-  --color-warn: var(--warn);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
@@ -37,5 +51,5 @@ body {
 
 ::selection {
   background: var(--accent);
-  color: #06210f;
+  color: var(--accent-ink);
 }

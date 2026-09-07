@@ -40,7 +40,7 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
 
           <div className="ml-auto flex items-center gap-3">
             {isMentor && (
-              <span className="rounded-full border border-accent/30 bg-accent-dim px-2 py-0.5 text-[11px] font-medium text-accent">
+              <span className="rounded-full border border-border-strong px-2 py-0.5 font-mono text-[10px] uppercase tracking-wide text-muted">
                 mentor
               </span>
             )}

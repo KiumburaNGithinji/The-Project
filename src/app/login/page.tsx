@@ -37,7 +37,7 @@ function LoginForm() {
         </p>
 
         {error && (
-          <p className="mt-6 rounded-md border border-danger/30 bg-danger/10 px-3 py-2 text-sm text-danger">
+          <p className="mt-6 rounded-md border-l-2 border-danger bg-danger/10 px-3 py-2 text-sm">
             {ERRORS[error] ?? "Something went wrong signing you in."}
           </p>
         )}
@@ -45,12 +45,12 @@ function LoginForm() {
         <button
           onClick={signIn}
           disabled={busy}
-          className="mt-8 w-full rounded-md bg-[#5865F2] px-4 py-2.5 text-sm font-medium text-white transition hover:bg-[#4752c4] disabled:opacity-60"
+          className="mt-8 w-full rounded-md bg-accent px-4 py-2.5 text-sm font-medium text-accent-ink transition hover:bg-accent-hover disabled:opacity-40"
         >
           {busy ? "Redirecting…" : "Continue with Discord"}
         </button>
 
-        <p className="mt-4 text-xs text-muted">
+        <p className="mt-4 text-xs text-muted-dim">
           Use the same Discord account you use in the server.
         </p>
       </div>
