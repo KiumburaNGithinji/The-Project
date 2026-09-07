@@ -5,6 +5,16 @@ const PUBLIC_PATHS = ["/login", "/auth", "/pending", "/preview"];
 
 /** Refreshes the Supabase session on every request and gates private routes. */
 export async function updateSession(request: NextRequest) {
+  // The OAuth callback owns the cookie jar until the code exchange finishes.
+  // Building a server client here calls getUser() on a request that has no
+  // session yet, and @supabase/ssr answers that by clearing every cookie under
+  // its storage key — including sb-<ref>-auth-token-code-verifier, the PKCE
+  // verifier the callback is about to read. Refreshing a session on the route
+  // that creates one is pointless anyway, so leave /auth untouched.
+  if (request.nextUrl.pathname.startsWith("/auth")) {
+    return NextResponse.next({ request });
+  }
+
   let response = NextResponse.next({ request });
 
   const supabase = createServerClient(
